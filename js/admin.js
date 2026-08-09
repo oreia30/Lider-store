@@ -108,6 +108,7 @@ async function loadAllData() {
   renderProductsTable();
   renderCategoriesTable();
   fillSettingsForm();
+  loadAdmins();
 }
 
 function categoryLabel(id) {
@@ -417,12 +418,19 @@ const settingInstagram = document.getElementById("settingInstagram");
 const settingLogoFile = document.getElementById("settingLogoFile");
 const settingLogoPreview = document.getElementById("settingLogoPreview");
 const settingsSaveMsg = document.getElementById("settingsSaveMsg");
+const settingMsgBuy = document.getElementById("settingMsgBuy");
+const settingMsgCart = document.getElementById("settingMsgCart");
+
+const DEFAULT_MSG_BUY = "Olá! Tenho interesse em comprar:\n\n1x {produto} - {preco}\n\nTotal: {total}";
+const DEFAULT_MSG_CART = "Olá! Gostaria de fazer o seguinte pedido na {loja}:\n\n{itens}\n\nTotal: {total}";
 
 function fillSettingsForm() {
   settingStoreName.value = ADMIN_SETTINGS.store_name || "";
   settingWhatsapp.value = ADMIN_SETTINGS.whatsapp_number || "";
   settingInstagram.value = ADMIN_SETTINGS.instagram || "";
   settingLogoPreview.src = ADMIN_SETTINGS.logo_url || "assets/logo/logo.png";
+  settingMsgBuy.value = ADMIN_SETTINGS.whatsapp_msg_buy || DEFAULT_MSG_BUY;
+  settingMsgCart.value = ADMIN_SETTINGS.whatsapp_msg_cart || DEFAULT_MSG_CART;
 }
 
 settingLogoFile.addEventListener("change", () => {
@@ -446,7 +454,9 @@ settingsForm.addEventListener("submit", async (e) => {
       { key: "store_name", value: settingStoreName.value.trim() },
       { key: "whatsapp_number", value: settingWhatsapp.value.trim() },
       { key: "instagram", value: settingInstagram.value.trim() },
-      { key: "logo_url", value: logoUrl }
+      { key: "logo_url", value: logoUrl },
+      { key: "whatsapp_msg_buy", value: settingMsgBuy.value.trim() || DEFAULT_MSG_BUY },
+      { key: "whatsapp_msg_cart", value: settingMsgCart.value.trim() || DEFAULT_MSG_CART }
     ];
 
     const { error } = await sb.from("settings").upsert(rows);
@@ -457,6 +467,126 @@ settingsForm.addEventListener("submit", async (e) => {
   } catch (err) {
     settingsSaveMsg.textContent = "Erro ao salvar: " + err.message;
     settingsSaveMsg.classList.add("error");
+  }
+});
+
+// ==== ADMINISTRADORES ====
+const adminsTableBody = document.getElementById("adminsTableBody");
+const adminsListMsg = document.getElementById("adminsListMsg");
+const adminModalOverlay = document.getElementById("adminModalOverlay");
+const adminForm = document.getElementById("adminForm");
+const adminEmailInput = document.getElementById("adminEmail");
+const adminPasswordInput = document.getElementById("adminPassword");
+const adminSaveMsg = document.getElementById("adminSaveMsg");
+const adminSaveBtn = document.getElementById("adminSaveBtn");
+
+let currentAdminUserId = null;
+
+async function callAdminUsersFn(payload) {
+  const { data: sessionData } = await sb.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      apikey: SUPABASE_ANON_KEY
+    },
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "Erro inesperado.");
+  return json;
+}
+
+function formatDateTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR");
+}
+
+async function loadAdmins() {
+  adminsListMsg.textContent = "Carregando...";
+  adminsListMsg.classList.remove("error");
+  try {
+    const { data: sessionData } = await sb.auth.getSession();
+    currentAdminUserId = sessionData?.session?.user?.id || null;
+
+    const { users } = await callAdminUsersFn({ action: "list" });
+    renderAdminsTable(users || []);
+    adminsListMsg.textContent = "";
+  } catch (err) {
+    adminsListMsg.textContent = "Erro ao carregar administradores: " + err.message;
+    adminsListMsg.classList.add("error");
+  }
+}
+
+function renderAdminsTable(users) {
+  if (users.length === 0) {
+    adminsTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Nenhum administrador.</td></tr>`;
+    return;
+  }
+  adminsTableBody.innerHTML = users.map(u => `
+    <tr data-id="${u.id}">
+      <td>${escapeHtml(u.email)}${u.id === currentAdminUserId ? " <em>(você)</em>" : ""}</td>
+      <td>${formatDateTime(u.created_at)}</td>
+      <td>${formatDateTime(u.last_sign_in_at)}</td>
+      <td>
+        <div class="admin-table-actions">
+          ${u.id === currentAdminUserId ? "" : `<button class="btn-admin-danger" data-action="delete-admin" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Remover</button>`}
+        </div>
+      </td>
+    </tr>
+  `).join("");
+}
+
+adminsTableBody.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-action='delete-admin']");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const email = btn.dataset.email;
+  if (!confirm(`Remover o acesso de "${email}"? Essa pessoa não poderá mais entrar no painel.`)) return;
+  try {
+    await callAdminUsersFn({ action: "delete", userId: id });
+    showToast("Administrador removido");
+    await loadAdmins();
+  } catch (err) {
+    showToast("Erro ao remover: " + err.message);
+  }
+});
+
+document.getElementById("newAdminBtn").addEventListener("click", () => {
+  adminForm.reset();
+  adminSaveMsg.textContent = "";
+  adminSaveMsg.classList.remove("error");
+  adminModalOverlay.hidden = false;
+});
+
+document.getElementById("adminCancelBtn").addEventListener("click", () => {
+  adminModalOverlay.hidden = true;
+});
+
+adminForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  adminSaveBtn.disabled = true;
+  adminSaveMsg.classList.remove("error");
+  adminSaveMsg.textContent = "Salvando...";
+
+  try {
+    await callAdminUsersFn({
+      action: "create",
+      email: adminEmailInput.value.trim(),
+      password: adminPasswordInput.value
+    });
+    adminModalOverlay.hidden = true;
+    showToast("Administrador adicionado");
+    await loadAdmins();
+  } catch (err) {
+    adminSaveMsg.textContent = "Erro ao salvar: " + err.message;
+    adminSaveMsg.classList.add("error");
+  } finally {
+    adminSaveBtn.disabled = false;
   }
 });
 
