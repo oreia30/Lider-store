@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin | Lider Store</title>
+<title>Admin | Líder Store</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="icon" type="image/png" href="assets/logo/logo.png">
+<link rel="icon" type="image/png" href="assets/logo/logo-icon.png">
+<link rel="apple-touch-icon" href="assets/logo/logo-icon.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/admin.css">
 </head>
@@ -14,9 +15,9 @@
 <!-- LOGIN -->
 <div class="admin-login-wrap" id="loginWrap">
   <form class="admin-login-card" id="loginForm">
-    <img src="assets/logo/logo.png" alt="Lider Store" class="admin-login-logo">
+    <img src="assets/logo/logo.png" alt="Líder Store" class="admin-login-logo">
     <h1>Painel Admin</h1>
-    <p class="admin-login-sub">Lider Store</p>
+    <p class="admin-login-sub">Líder Store</p>
     <label>E-mail
       <input type="email" id="loginEmail" required autocomplete="username">
     </label>
@@ -33,7 +34,7 @@
   <header class="admin-header">
     <div class="admin-header-brand">
       <img src="assets/logo/logo.png" alt="" class="admin-header-logo">
-      <span>Painel Admin — Lider Store</span>
+      <span>Painel Admin — Líder Store</span>
     </div>
     <div class="admin-header-actions">
       <span class="admin-user-email" id="userEmail"></span>
@@ -113,9 +114,40 @@
             </div>
           </div>
         </div>
+
+        <div class="admin-field" style="margin-bottom:14px;">
+          <label for="settingMsgBuy">Mensagem do WhatsApp — "Comprar" (produto único)</label>
+          <textarea id="settingMsgBuy" rows="4"></textarea>
+          <p class="admin-hint">Use: {produto} {preco} {total}</p>
+        </div>
+
+        <div class="admin-field" style="margin-bottom:14px;">
+          <label for="settingMsgCart">Mensagem do WhatsApp — Carrinho</label>
+          <textarea id="settingMsgCart" rows="5"></textarea>
+          <p class="admin-hint">Use: {loja} {itens} {total} — {itens} é substituído pela lista de produtos do carrinho.</p>
+        </div>
+
         <button type="submit" class="btn-admin-primary">Salvar configurações</button>
         <p class="admin-save-msg" id="settingsSaveMsg"></p>
       </form>
+    </section>
+
+    <!-- ADMINISTRADORES -->
+    <section class="admin-panel" id="panel-config-admins" style="margin-top:24px;">
+      <div class="admin-panel-header">
+        <h2>Administradores</h2>
+        <button class="btn-admin-primary" id="newAdminBtn">+ Novo admin</button>
+      </div>
+      <p class="admin-hint" style="margin-top:-8px;margin-bottom:14px;">Pessoas com acesso a este painel. Qualquer admin pode gerenciar produtos, categorias e configurações.</p>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>E-mail</th><th>Criado em</th><th>Último acesso</th><th></th></tr>
+          </thead>
+          <tbody id="adminsTableBody"></tbody>
+        </table>
+      </div>
+      <p class="admin-save-msg" id="adminsListMsg"></p>
     </section>
 
   </main>
@@ -178,6 +210,29 @@
         <button type="submit" class="btn-admin-primary">Salvar</button>
       </div>
       <p class="admin-save-msg" id="categorySaveMsg"></p>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL NOVO ADMIN -->
+<div class="admin-modal-overlay" id="adminModalOverlay" hidden>
+  <div class="admin-modal">
+    <h2>Novo administrador</h2>
+    <form id="adminForm">
+      <div class="admin-field">
+        <label for="adminEmail">E-mail</label>
+        <input type="email" id="adminEmail" required>
+      </div>
+      <div class="admin-field">
+        <label for="adminPassword">Senha (mín. 6 caracteres)</label>
+        <input type="text" id="adminPassword" required minlength="6">
+      </div>
+      <p class="admin-hint">A pessoa já pode entrar com esse e-mail e senha assim que você salvar — combine a senha com ela por fora.</p>
+      <div class="admin-modal-actions">
+        <button type="button" class="btn-admin-ghost" id="adminCancelBtn">Cancelar</button>
+        <button type="submit" class="btn-admin-primary" id="adminSaveBtn">Salvar</button>
+      </div>
+      <p class="admin-save-msg" id="adminSaveMsg"></p>
     </form>
   </div>
 </div>
