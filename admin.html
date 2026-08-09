@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin | Lider Store</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="assets/logo/logo.png">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-body">
+
+<!-- LOGIN -->
+<div class="admin-login-wrap" id="loginWrap">
+  <form class="admin-login-card" id="loginForm">
+    <img src="assets/logo/logo.png" alt="Lider Store" class="admin-login-logo">
+    <h1>Painel Admin</h1>
+    <p class="admin-login-sub">Lider Store</p>
+    <label>E-mail
+      <input type="email" id="loginEmail" required autocomplete="username">
+    </label>
+    <label>Senha
+      <input type="password" id="loginPassword" required autocomplete="current-password">
+    </label>
+    <button type="submit" class="btn-admin-primary">Entrar</button>
+    <p class="admin-login-error" id="loginError"></p>
+  </form>
+</div>
+
+<!-- DASHBOARD -->
+<div class="admin-dashboard" id="dashboard" hidden>
+  <header class="admin-header">
+    <div class="admin-header-brand">
+      <img src="assets/logo/logo.png" alt="" class="admin-header-logo">
+      <span>Painel Admin — Lider Store</span>
+    </div>
+    <div class="admin-header-actions">
+      <span class="admin-user-email" id="userEmail"></span>
+      <a href="index.html" target="_blank" class="btn-admin-ghost">Ver site</a>
+      <button class="btn-admin-ghost" id="logoutBtn">Sair</button>
+    </div>
+  </header>
+
+  <nav class="admin-tabs">
+    <button class="admin-tab active" data-tab="produtos">Produtos</button>
+    <button class="admin-tab" data-tab="categorias">Categorias</button>
+    <button class="admin-tab" data-tab="config">Configurações</button>
+  </nav>
+
+  <main class="admin-content">
+
+    <!-- PRODUTOS -->
+    <section class="admin-panel" id="panel-produtos">
+      <div class="admin-panel-header">
+        <h2>Produtos</h2>
+        <button class="btn-admin-primary" id="newProductBtn">+ Novo produto</button>
+      </div>
+      <div class="admin-filter-row">
+        <input type="text" id="productSearch" placeholder="Buscar produto...">
+        <select id="productCategoryFilter">
+          <option value="">Todas as categorias</option>
+        </select>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th></th><th>Nome</th><th>Categoria</th><th>Preço</th><th></th></tr>
+          </thead>
+          <tbody id="productsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CATEGORIAS -->
+    <section class="admin-panel" id="panel-categorias" hidden>
+      <div class="admin-panel-header">
+        <h2>Categorias</h2>
+        <button class="btn-admin-primary" id="newCategoryBtn">+ Nova categoria</button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Nome exibido</th><th>Identificador</th><th>Ordem</th><th></th></tr>
+          </thead>
+          <tbody id="categoriesTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CONFIGURAÇÕES -->
+    <section class="admin-panel" id="panel-config" hidden>
+      <h2>Configurações da loja</h2>
+      <form class="admin-settings-form" id="settingsForm">
+        <div class="admin-settings-grid">
+          <div class="admin-field">
+            <label for="settingStoreName">Nome da loja</label>
+            <input type="text" id="settingStoreName">
+          </div>
+          <div class="admin-field">
+            <label for="settingWhatsapp">WhatsApp (com DDI+DDD, só números)</label>
+            <input type="text" id="settingWhatsapp" placeholder="5532999999999">
+          </div>
+          <div class="admin-field">
+            <label for="settingInstagram">Instagram (sem @)</label>
+            <input type="text" id="settingInstagram" placeholder="liderstoresf">
+          </div>
+          <div class="admin-field">
+            <label for="settingLogoFile">Logo da loja</label>
+            <div class="admin-logo-row">
+              <img id="settingLogoPreview" class="admin-logo-preview" alt="Logo atual">
+              <input type="file" id="settingLogoFile" accept="image/*">
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn-admin-primary">Salvar configurações</button>
+        <p class="admin-save-msg" id="settingsSaveMsg"></p>
+      </form>
+    </section>
+
+  </main>
+</div>
+
+<!-- MODAL PRODUTO -->
+<div class="admin-modal-overlay" id="productModalOverlay" hidden>
+  <div class="admin-modal">
+    <h2 id="productModalTitle">Novo produto</h2>
+    <form id="productForm">
+      <input type="hidden" id="productId">
+      <div class="admin-field">
+        <label for="productName">Nome</label>
+        <input type="text" id="productName" required>
+      </div>
+      <div class="admin-field">
+        <label for="productPrice">Preço (R$)</label>
+        <input type="number" id="productPrice" min="0" step="0.01" required>
+      </div>
+      <div class="admin-field">
+        <label for="productCategory">Categoria</label>
+        <select id="productCategory" required></select>
+      </div>
+      <div class="admin-field">
+        <label for="productImageFile">Foto do produto</label>
+        <div class="admin-logo-row">
+          <img id="productImagePreview" class="admin-logo-preview" alt="">
+          <input type="file" id="productImageFile" accept="image/*">
+        </div>
+      </div>
+      <div class="admin-modal-actions">
+        <button type="button" class="btn-admin-ghost" id="productCancelBtn">Cancelar</button>
+        <button type="submit" class="btn-admin-primary" id="productSaveBtn">Salvar</button>
+      </div>
+      <p class="admin-save-msg" id="productSaveMsg"></p>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL CATEGORIA -->
+<div class="admin-modal-overlay" id="categoryModalOverlay" hidden>
+  <div class="admin-modal">
+    <h2 id="categoryModalTitle">Nova categoria</h2>
+    <form id="categoryForm">
+      <input type="hidden" id="categoryOriginalId">
+      <div class="admin-field">
+        <label for="categoryLabel">Nome exibido</label>
+        <input type="text" id="categoryLabel" required placeholder="Ex: Perfumes Masculinos">
+      </div>
+      <div class="admin-field">
+        <label for="categoryId">Identificador (gerado automaticamente)</label>
+        <input type="text" id="categoryId" required>
+      </div>
+      <div class="admin-field">
+        <label for="categorySort">Ordem</label>
+        <input type="number" id="categorySort" value="0">
+      </div>
+      <div class="admin-modal-actions">
+        <button type="button" class="btn-admin-ghost" id="categoryCancelBtn">Cancelar</button>
+        <button type="submit" class="btn-admin-primary">Salvar</button>
+      </div>
+      <p class="admin-save-msg" id="categorySaveMsg"></p>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
