@@ -2,6 +2,7 @@
 let ADMIN_PRODUCTS = [];
 let ADMIN_CATEGORIES = [];
 let ADMIN_SETTINGS = {};
+let ADMIN_BANNERS = [];
 
 // ==== ELEMENTOS ====
 const loginWrap = document.getElementById("loginWrap");
@@ -94,19 +95,22 @@ document.querySelectorAll(".admin-tab").forEach(tab => {
 
 // ==== CARREGAR DADOS ====
 async function loadAllData() {
-  const [prodRes, catRes, settRes] = await Promise.all([
+  const [prodRes, catRes, settRes, bannerRes] = await Promise.all([
     sb.from("products").select("*").order("created_at", { ascending: true }),
     sb.from("categories").select("*").order("sort_order", { ascending: true }),
-    sb.from("settings").select("*")
+    sb.from("settings").select("*"),
+    sb.from("banners").select("*").order("sort_order", { ascending: true })
   ]);
   ADMIN_PRODUCTS = prodRes.data || [];
   ADMIN_CATEGORIES = catRes.data || [];
   ADMIN_SETTINGS = {};
   (settRes.data || []).forEach(s => { ADMIN_SETTINGS[s.key] = s.value; });
+  ADMIN_BANNERS = bannerRes.data || [];
 
   renderCategoryFilterOptions();
   renderProductsTable();
   renderCategoriesTable();
+  renderBannersTable();
   fillSettingsForm();
   loadAdmins();
 }
@@ -407,6 +411,136 @@ async function deleteCategory(id) {
     return;
   }
   showToast("Categoria excluída");
+  await loadAllData();
+}
+
+// ==== BANNER: TABELA ====
+const bannersTableBody = document.getElementById("bannersTableBody");
+
+function renderBannersTable() {
+  if (ADMIN_BANNERS.length === 0) {
+    bannersTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Nenhum banner cadastrado.</td></tr>`;
+    return;
+  }
+  bannersTableBody.innerHTML = ADMIN_BANNERS.map(b => `
+    <tr data-id="${b.id}">
+      <td><img class="admin-table-thumb" src="${b.image_url}" alt=""></td>
+      <td>${escapeHtml(b.badge_text || "—")}</td>
+      <td>${b.sort_order}</td>
+      <td>
+        <div class="admin-table-actions">
+          <button class="btn-admin-small" data-action="edit-banner" data-id="${b.id}">Editar</button>
+          <button class="btn-admin-danger" data-action="delete-banner" data-id="${b.id}">Excluir</button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+}
+
+bannersTableBody.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-action]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.dataset.action === "edit-banner") openBannerModal(id);
+  if (btn.dataset.action === "delete-banner") deleteBanner(id);
+});
+
+// ==== BANNER: MODAL ====
+const bannerModalOverlay = document.getElementById("bannerModalOverlay");
+const bannerForm = document.getElementById("bannerForm");
+const bannerModalTitle = document.getElementById("bannerModalTitle");
+const bannerIdInput = document.getElementById("bannerId");
+const bannerImageFile = document.getElementById("bannerImageFile");
+const bannerImagePreview = document.getElementById("bannerImagePreview");
+const bannerBadgeTextInput = document.getElementById("bannerBadgeText");
+const bannerSortInput = document.getElementById("bannerSort");
+const bannerSaveMsg = document.getElementById("bannerSaveMsg");
+const bannerSaveBtn = document.getElementById("bannerSaveBtn");
+
+document.getElementById("newBannerBtn").addEventListener("click", () => openBannerModal(null));
+document.getElementById("bannerCancelBtn").addEventListener("click", () => bannerModalOverlay.hidden = true);
+
+function openBannerModal(id) {
+  bannerForm.reset();
+  bannerSaveMsg.textContent = "";
+  bannerSaveMsg.classList.remove("error");
+
+  if (id) {
+    const b = ADMIN_BANNERS.find(b => b.id === id);
+    bannerModalTitle.textContent = "Editar banner";
+    bannerIdInput.value = b.id;
+    bannerImagePreview.src = b.image_url;
+    bannerBadgeTextInput.value = b.badge_text || "";
+    bannerSortInput.value = b.sort_order;
+  } else {
+    bannerModalTitle.textContent = "Novo banner";
+    bannerIdInput.value = "";
+    bannerImagePreview.src = "";
+    bannerSortInput.value = ADMIN_BANNERS.length;
+  }
+  bannerModalOverlay.hidden = false;
+}
+
+bannerImageFile.addEventListener("change", () => {
+  const file = bannerImageFile.files[0];
+  if (file) bannerImagePreview.src = URL.createObjectURL(file);
+});
+
+bannerForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  bannerSaveBtn.disabled = true;
+  bannerSaveMsg.classList.remove("error");
+  bannerSaveMsg.textContent = "Salvando...";
+
+  try {
+    const id = bannerIdInput.value;
+    let imgUrl = id ? ADMIN_BANNERS.find(b => b.id === id).image_url : "";
+
+    const file = bannerImageFile.files[0];
+    if (file) {
+      imgUrl = await uploadImage(file, "banners");
+    }
+
+    if (!imgUrl) {
+      bannerSaveMsg.textContent = "Escolha uma imagem para o banner.";
+      bannerSaveMsg.classList.add("error");
+      bannerSaveBtn.disabled = false;
+      return;
+    }
+
+    const payload = {
+      image_url: imgUrl,
+      badge_text: bannerBadgeTextInput.value.trim() || null,
+      sort_order: Number(bannerSortInput.value) || 0
+    };
+
+    let error;
+    if (id) {
+      ({ error } = await sb.from("banners").update(payload).eq("id", id));
+    } else {
+      ({ error } = await sb.from("banners").insert(payload));
+    }
+    if (error) throw error;
+
+    bannerModalOverlay.hidden = true;
+    showToast(id ? "Banner atualizado" : "Banner criado");
+    await loadAllData();
+  } catch (err) {
+    bannerSaveMsg.textContent = "Erro ao salvar: " + err.message;
+    bannerSaveMsg.classList.add("error");
+  } finally {
+    bannerSaveBtn.disabled = false;
+  }
+});
+
+async function deleteBanner(id) {
+  if (!confirm("Excluir este banner?")) return;
+  const { error } = await sb.from("banners").delete().eq("id", id);
+  if (error) {
+    showToast("Erro ao excluir: " + error.message);
+    return;
+  }
+  showToast("Banner excluído");
   await loadAllData();
 }
 

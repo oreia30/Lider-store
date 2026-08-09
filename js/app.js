@@ -75,6 +75,7 @@ function cartTotal() {
 let PRODUCTS = [];
 let CATEGORIES = [];
 let SETTINGS = {};
+let BANNERS = [];
 let currentCategory = null;
 let searchQuery = "";
 
@@ -447,6 +448,20 @@ function applySettings() {
 }
 
 // ==== BANNER CAROUSEL ====
+function renderBannerSlides() {
+  const track = document.getElementById("bannerTrack");
+  if (!track) return;
+  if (!BANNERS.length) {
+    track.innerHTML = "";
+    return;
+  }
+  track.innerHTML = BANNERS.map(b => `
+    <div class="banner-slide" style="background-image: url('${b.image_url}')">
+      ${b.badge_text ? `<span class="banner-badge">${escapeHtml(b.badge_text)}</span>` : ""}
+    </div>
+  `).join("");
+}
+
 function initBannerCarousel() {
   const track = document.getElementById("bannerTrack");
   const dotsWrap = document.getElementById("bannerDots");
@@ -454,11 +469,19 @@ function initBannerCarousel() {
   const nextBtn = document.getElementById("bannerNext");
   if (!track) return;
 
+  renderBannerSlides();
+
   const slides = Array.from(track.children);
+  if (dotsWrap) dotsWrap.innerHTML = "";
+  if (slides.length === 0) {
+    if (prevBtn) prevBtn.style.display = "none";
+    if (nextBtn) nextBtn.style.display = "none";
+    return;
+  }
+
   let index = 0;
   let timer;
 
-  dotsWrap.innerHTML = "";
   slides.forEach((_, i) => {
     const dot = document.createElement("button");
     dot.className = "banner-dot" + (i === 0 ? " active" : "");
@@ -484,11 +507,16 @@ function initBannerCarousel() {
 
   function resetTimer() {
     clearInterval(timer);
-    timer = setInterval(next, 5000);
+    if (slides.length > 1) timer = setInterval(next, 5000);
   }
 
-  prevBtn.addEventListener("click", prev);
-  nextBtn.addEventListener("click", next);
+  const multi = slides.length > 1;
+  if (prevBtn) prevBtn.style.display = multi ? "" : "none";
+  if (nextBtn) nextBtn.style.display = multi ? "" : "none";
+  if (dotsWrap) dotsWrap.style.display = multi ? "" : "none";
+
+  if (prevBtn) prevBtn.addEventListener("click", prev);
+  if (nextBtn) nextBtn.addEventListener("click", next);
 
   update();
   resetTimer();
@@ -497,10 +525,11 @@ function initBannerCarousel() {
 // ==== CARREGAR DADOS DO SUPABASE ====
 async function loadStoreData() {
   try {
-    const [prodRes, catRes, settRes] = await Promise.all([
+    const [prodRes, catRes, settRes, bannerRes] = await Promise.all([
       sb.from("products").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
       sb.from("categories").select("*").order("sort_order", { ascending: true }),
-      sb.from("settings").select("*")
+      sb.from("settings").select("*"),
+      sb.from("banners").select("*").order("sort_order", { ascending: true })
     ]);
 
     PRODUCTS = (prodRes.data || []).map(p => ({
@@ -513,6 +542,7 @@ async function loadStoreData() {
     CATEGORIES = catRes.data || [];
     SETTINGS = {};
     (settRes.data || []).forEach(s => { SETTINGS[s.key] = s.value; });
+    BANNERS = bannerRes.data || [];
 
     currentCategory = CATEGORIES[0] ? CATEGORIES[0].id : null;
 
@@ -520,6 +550,7 @@ async function loadStoreData() {
     renderCategoryChips();
     renderProducts();
     renderCart();
+    initBannerCarousel();
   } catch (err) {
     console.error("Erro ao carregar dados da loja:", err);
     productGrid.innerHTML = `<p style="padding:24px;text-align:center;color:#888;">Não foi possível carregar os produtos agora. Tente recarregar a página.</p>`;
@@ -528,6 +559,5 @@ async function loadStoreData() {
 
 // ==== INIT ====
 loadStoreData();
-initBannerCarousel();
 updateHeaderHeight();
 window.addEventListener("resize", updateHeaderHeight);
