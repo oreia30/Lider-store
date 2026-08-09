@@ -130,24 +130,24 @@
         <button type="submit" class="btn-admin-primary">Salvar configurações</button>
         <p class="admin-save-msg" id="settingsSaveMsg"></p>
       </form>
-    </section>
 
-    <!-- ADMINISTRADORES -->
-    <section class="admin-panel" id="panel-config-admins" style="margin-top:24px;">
-      <div class="admin-panel-header">
-        <h2>Administradores</h2>
-        <button class="btn-admin-primary" id="newAdminBtn">+ Novo admin</button>
+      <!-- ADMINISTRADORES -->
+      <div class="admin-config-admins" id="panel-config-admins" style="margin-top:24px;">
+        <div class="admin-panel-header">
+          <h2>Administradores</h2>
+          <button class="btn-admin-primary" id="newAdminBtn">+ Novo admin</button>
+        </div>
+        <p class="admin-hint" style="margin-top:-8px;margin-bottom:14px;">Pessoas com acesso a este painel. Qualquer admin pode gerenciar produtos, categorias e configurações.</p>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>E-mail</th><th>Criado em</th><th>Último acesso</th><th></th></tr>
+            </thead>
+            <tbody id="adminsTableBody"></tbody>
+          </table>
+        </div>
+        <p class="admin-save-msg" id="adminsListMsg"></p>
       </div>
-      <p class="admin-hint" style="margin-top:-8px;margin-bottom:14px;">Pessoas com acesso a este painel. Qualquer admin pode gerenciar produtos, categorias e configurações.</p>
-      <div class="admin-table-wrap">
-        <table class="admin-table">
-          <thead>
-            <tr><th>E-mail</th><th>Criado em</th><th>Último acesso</th><th></th></tr>
-          </thead>
-          <tbody id="adminsTableBody"></tbody>
-        </table>
-      </div>
-      <p class="admin-save-msg" id="adminsListMsg"></p>
     </section>
 
   </main>
