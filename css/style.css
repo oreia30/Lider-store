@@ -180,10 +180,13 @@ button { font-family: inherit; cursor: pointer; }
 .banner-carousel {
   position: relative;
   overflow: hidden;
-  width: 100%;
   aspect-ratio: 3 / 1;
   max-height: 420px;
   background: var(--blue-900);
+}
+
+@media (min-width: 561px) {
+  .banner-carousel { width: 100%; }
 }
 
 .banner-track {
