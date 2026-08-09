@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lider Store | Catálogo de Perfumes</title>
+<meta name="description" content="Lider Store - Perfumes e miniaturas importadas. Faça seu pedido pelo WhatsApp.">
+<link rel="icon" type="image/png" href="assets/logo/logo.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <img src="assets/logo/logo.png" alt="Lider Store" class="brand-logo">
+      <div class="brand-text">
+        <span class="brand-name">Lider Store</span>
+        <span class="brand-tagline">Perfumes &amp; Miniaturas Importadas</span>
+      </div>
+    </div>
+
+    <button class="cart-btn" id="cartBtn" aria-label="Abrir carrinho">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
+      <span class="cart-count" id="cartCount">0</span>
+    </button>
+  </div>
+</header>
+
+<section class="banner-carousel" id="bannerCarousel">
+  <div class="banner-track" id="bannerTrack">
+    <div class="banner-slide" style="background-image: url('assets/banner/banner-1-hero.jpg')">
+      <span class="banner-badge">Frete combinado no WhatsApp</span>
+    </div>
+    <div class="banner-slide" style="background-image: url('assets/banner/banner-2-promo.jpg')">
+      <span class="banner-badge pulse">Oferta por tempo limitado</span>
+    </div>
+  </div>
+  <button class="banner-nav banner-prev" id="bannerPrev" aria-label="Slide anterior">&#8249;</button>
+  <button class="banner-nav banner-next" id="bannerNext" aria-label="Próximo slide">&#8250;</button>
+  <div class="banner-dots" id="bannerDots"></div>
+</section>
+
+<div class="promo-strip">
+  <span class="promo-strip-text"><strong>3 frascos por R$ 270</strong> — estoque limitado da promoção, garanta o seu pelo WhatsApp</span>
+</div>
+
+<nav class="category-bar">
+  <div class="category-bar-inner" id="categoryBarInner"></div>
+</nav>
+
+<main class="container">
+  <div class="section-title-row">
+    <h2 class="section-title" id="sectionTitle">Produtos</h2>
+    <span class="section-count" id="productCount">0 produtos</span>
+  </div>
+
+  <div class="product-grid" id="productGrid"></div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-col">
+      <img src="assets/logo/logo.png" alt="Lider Store" class="footer-logo">
+      <p>Perfumes &amp; Miniaturas Importadas.</p>
+    </div>
+    <div class="footer-col">
+      <h3>Entre em contato</h3>
+      <p id="footerWhats">WhatsApp: <a href="#" id="footerWhatsLink">(configurar número)</a></p>
+      <p id="footerInsta">@lider.store</p>
+    </div>
+    <div class="footer-col">
+      <h3>Categorias</h3>
+      <div id="footerCategories"></div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>Catálogo online desenvolvido para Lider Store</p>
+  </div>
+</footer>
+
+<!-- Carrinho -->
+<div class="cart-overlay" id="cartOverlay"></div>
+<aside class="cart-drawer" id="cartDrawer">
+  <div class="cart-header">
+    <h2>Seu carrinho</h2>
+    <button class="cart-close" id="cartClose" aria-label="Fechar carrinho">&times;</button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <p class="cart-empty" id="cartEmpty">Seu carrinho está vazio.<br>Adicione produtos para continuar.</p>
+  </div>
+  <div class="cart-footer" id="cartFooter">
+    <div class="cart-total-row">
+      <span>Total</span>
+      <span id="cartTotal">R$ 0,00</span>
+    </div>
+    <button class="btn-whatsapp-checkout" id="checkoutBtn">
+      <svg viewBox="0 0 32 32" width="20" height="20" fill="currentColor"><path d="M16.001 3C9.373 3 4 8.373 4 15c0 2.386.633 4.622 1.734 6.552L4 29l7.63-1.696A11.94 11.94 0 0 0 16.001 27C22.628 27 28 21.627 28 15S22.628 3 16.001 3zm0 21.75a9.7 9.7 0 0 1-4.95-1.354l-.355-.21-4.527 1.006 1.008-4.412-.232-.368A9.716 9.716 0 0 1 5.25 15c0-5.936 4.815-10.75 10.751-10.75S26.75 9.064 26.75 15 21.937 24.75 16.001 24.75zm5.61-8.146c-.307-.154-1.816-.897-2.098-.999-.281-.103-.486-.154-.69.154-.204.307-.792.999-.972 1.204-.179.204-.358.23-.665.077-.307-.154-1.296-.478-2.469-1.524-.913-.814-1.53-1.82-1.709-2.127-.179-.307-.019-.473.135-.626.139-.138.307-.358.46-.537.154-.179.205-.307.307-.512.103-.204.052-.384-.026-.537-.077-.154-.69-1.662-.945-2.276-.249-.598-.502-.517-.69-.527-.179-.008-.384-.01-.588-.01a1.13 1.13 0 0 0-.818.384c-.281.307-1.073 1.05-1.073 2.558 0 1.508 1.099 2.965 1.252 3.169.154.204 2.163 3.303 5.243 4.632.733.316 1.305.505 1.751.647.735.234 1.404.201 1.933.122.59-.088 1.816-.742 2.072-1.459.256-.716.256-1.33.179-1.459-.077-.128-.281-.204-.588-.358z"/></svg>
+      Finalizar pedido no WhatsApp
+    </button>
+  </div>
+</aside>
+
+<!-- Notificação flutuante -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
