@@ -46,6 +46,7 @@
   <nav class="admin-tabs">
     <button class="admin-tab active" data-tab="produtos">Produtos</button>
     <button class="admin-tab" data-tab="categorias">Categorias</button>
+    <button class="admin-tab" data-tab="banner">Banner</button>
     <button class="admin-tab" data-tab="config">Configurações</button>
   </nav>
 
@@ -85,6 +86,23 @@
             <tr><th>Nome exibido</th><th>Identificador</th><th>Ordem</th><th></th></tr>
           </thead>
           <tbody id="categoriesTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- BANNER -->
+    <section class="admin-panel" id="panel-banner" hidden>
+      <div class="admin-panel-header">
+        <h2>Banner da página inicial</h2>
+        <button class="btn-admin-primary" id="newBannerBtn">+ Novo banner</button>
+      </div>
+      <p class="admin-hint" style="margin-top:-8px;margin-bottom:14px;">As imagens aparecem em rotação no topo do site. Tamanho recomendado: 1200x400px (proporção 3:1).</p>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th></th><th>Texto do selo</th><th>Ordem</th><th></th></tr>
+          </thead>
+          <tbody id="bannersTableBody"></tbody>
         </table>
       </div>
     </section>
@@ -210,6 +228,36 @@
         <button type="submit" class="btn-admin-primary">Salvar</button>
       </div>
       <p class="admin-save-msg" id="categorySaveMsg"></p>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL BANNER -->
+<div class="admin-modal-overlay" id="bannerModalOverlay" hidden>
+  <div class="admin-modal">
+    <h2 id="bannerModalTitle">Novo banner</h2>
+    <form id="bannerForm">
+      <input type="hidden" id="bannerId">
+      <div class="admin-field">
+        <label for="bannerImageFile">Imagem do banner (recomendado 1200x400px)</label>
+        <div class="admin-logo-row">
+          <img id="bannerImagePreview" class="admin-logo-preview" alt="">
+          <input type="file" id="bannerImageFile" accept="image/*">
+        </div>
+      </div>
+      <div class="admin-field">
+        <label for="bannerBadgeText">Texto do selo (opcional)</label>
+        <input type="text" id="bannerBadgeText" placeholder="Ex: Frete combinado no WhatsApp">
+      </div>
+      <div class="admin-field">
+        <label for="bannerSort">Ordem</label>
+        <input type="number" id="bannerSort" value="0">
+      </div>
+      <div class="admin-modal-actions">
+        <button type="button" class="btn-admin-ghost" id="bannerCancelBtn">Cancelar</button>
+        <button type="submit" class="btn-admin-primary" id="bannerSaveBtn">Salvar</button>
+      </div>
+      <p class="admin-save-msg" id="bannerSaveMsg"></p>
     </form>
   </div>
 </div>
