@@ -1,8 +1,16 @@
 // ==== CONFIGURAÇÃO DA LOJA (valores padrão, sobrescritos pelo banco) ====
 const CONFIG = {
   whatsappNumber: "5532984280734",
-  storeName: "Lider Store"
+  storeName: "Líder Store"
 };
+
+// ==== MENSAGENS PADRÃO DO WHATSAPP (usadas se não houver configuração salva) ====
+const DEFAULT_MSG_BUY = "Olá! Tenho interesse em comprar:\n\n1x {produto} - {preco}\n\nTotal: {total}";
+const DEFAULT_MSG_CART = "Olá! Gostaria de fazer o seguinte pedido na {loja}:\n\n{itens}\n\nTotal: {total}";
+
+function fillTemplate(tpl, vars) {
+  return tpl.replace(/\{(\w+)\}/g, (match, key) => (key in vars ? vars[key] : match));
+}
 
 // ==== CARRINHO (localStorage) ====
 const CART_KEY = "liderstore_cart";
@@ -155,7 +163,12 @@ function whatsappLink(message) {
 }
 
 function buyDirect(product) {
-  const message = `Olá! Tenho interesse em comprar:\n\n1x ${product.name} - ${formatBRL(product.price)}\n\nTotal: ${formatBRL(product.price)}`;
+  const tpl = SETTINGS.whatsapp_msg_buy || DEFAULT_MSG_BUY;
+  const message = fillTemplate(tpl, {
+    produto: product.name,
+    preco: formatBRL(product.price),
+    total: formatBRL(product.price)
+  });
   window.open(whatsappLink(message), "_blank");
 }
 
@@ -163,13 +176,19 @@ function checkoutCart() {
   const items = Object.entries(cart);
   if (items.length === 0) return;
 
-  let message = `Olá! Gostaria de fazer o seguinte pedido na ${CONFIG.storeName}:\n\n`;
+  let itensText = "";
   items.forEach(([id, qty]) => {
     const p = findProduct(id);
     if (!p) return;
-    message += `${qty}x ${p.name} - ${formatBRL(p.price * qty)}\n`;
+    itensText += `${qty}x ${p.name} - ${formatBRL(p.price * qty)}\n`;
   });
-  message += `\nTotal: ${formatBRL(cartTotal())}`;
+
+  const tpl = SETTINGS.whatsapp_msg_cart || DEFAULT_MSG_CART;
+  const message = fillTemplate(tpl, {
+    loja: CONFIG.storeName,
+    itens: itensText.trim(),
+    total: formatBRL(cartTotal())
+  });
 
   window.open(whatsappLink(message), "_blank");
 }
