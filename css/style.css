@@ -280,6 +280,7 @@ button { font-family: inherit; cursor: pointer; }
 
 @media (max-width: 560px) {
   .banner-carousel { aspect-ratio: 2 / 1; max-height: 320px; }
+  .banner-slide { background-size: contain; background-color: var(--blue-900); }
   .banner-nav { width: 30px; height: 30px; font-size: 18px; }
   .banner-badge { font-size: 9.5px; padding: 4px 8px; top: 8px; left: 8px; }
 }
