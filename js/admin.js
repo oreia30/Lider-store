@@ -1,4 +1,4 @@
-// ==== PAINEL LÍDER STORE: núcleo, navegação, perfumes e site ====
+// ==== PAINEL LÍDER STORE: núcleo, navegação, produtos e site ====
 
 // ---------- estado ----------
 let ADMIN_PRODUCTS = [];
@@ -6,6 +6,7 @@ let ADMIN_CATEGORIES = [];
 let ADMIN_SETTINGS = {};
 let ADMIN_BANNERS = [];
 let COSTS = {};                    // product_id -> custo
+let VARIANTS = {};                 // product_id -> [{ id, name, stock, sort_order }] (tamanho, voltagem...)
 
 let statusFilter = "active";       // active | stock | low | nostock | noprice | hidden | all
 let selecting = false;
@@ -59,6 +60,17 @@ const isActive = (p) => p.active !== false;
 const stockOf = (p) => Number(p.stock || 0);
 const hasPrice = (p) => Number(p.price) > 0;
 const productById = (id) => ADMIN_PRODUCTS.find(p => p.id === id);
+const variantsOf = (id) => VARIANTS[id] || [];
+const hasVariants = (id) => variantsOf(id).length > 0;
+function variantById(vid) {
+  for (const k in VARIANTS) { const v = VARIANTS[k].find(x => x.id === vid); if (v) return v; }
+  return null;
+}
+function setVariants(rows) {
+  VARIANTS = {};
+  (rows || []).forEach(v => { (VARIANTS[v.product_id] = VARIANTS[v.product_id] || []).push(v); });
+  Object.values(VARIANTS).forEach(a => a.sort((x, y) => x.sort_order - y.sort_order || x.name.localeCompare(y.name)));
+}
 
 function stockPill(p) {
   const s = stockOf(p);
@@ -199,7 +211,7 @@ document.addEventListener("click", async (e) => {
 
 // ---------- navegação ----------
 const VIEW_TITLES = {
-  inicio: "Início", produtos: "Perfumes", vender: "Vender", vendas: "Vendas", prazo: "Prazo e clientes",
+  inicio: "Início", produtos: "Produtos", vender: "Vender", vendas: "Vendas", prazo: "Prazo e clientes",
   maquininha: "Maquininha", site: "Loja e site", categorias: "Categorias", banners: "Banners", acessos: "Acessos", mais: "Mais"
 };
 const SUB_OF_MAIS = ["prazo", "maquininha", "site", "categorias", "banners", "acessos"];
@@ -240,14 +252,16 @@ $("topBack").addEventListener("click", () => showView("mais"));
 
 // ---------- carregar dados ----------
 async function loadAllData() {
-  const [prodRes, catRes, settRes, bannerRes, costRes] = await Promise.all([
+  const [prodRes, catRes, settRes, bannerRes, costRes, varRes] = await Promise.all([
     sb.from("products").select("*").order("created_at", { ascending: true }),
     sb.from("categories").select("*").order("sort_order", { ascending: true }),
     sb.from("settings").select("*"),
     sb.from("banners").select("*").order("sort_order", { ascending: true }),
-    sb.from("product_costs").select("product_id,cost")
+    sb.from("product_costs").select("product_id,cost"),
+    sb.from("product_variants").select("*")
   ]);
-  if (prodRes.error) showToast("Não consegui carregar os perfumes. Recarregue a página.");
+  if (!varRes.error) setVariants(varRes.data);
+  if (prodRes.error) showToast("Não consegui carregar os produtos. Recarregue a página.");
   ADMIN_PRODUCTS = prodRes.data || [];
   ADMIN_CATEGORIES = catRes.data || [];
   ADMIN_SETTINGS = {};
@@ -267,10 +281,12 @@ async function loadAllData() {
   HOOKS.data.forEach(fn => fn());
 }
 async function reloadProducts() {
-  const [p, c] = await Promise.all([
+  const [p, c, v] = await Promise.all([
     sb.from("products").select("*").order("created_at", { ascending: true }),
-    sb.from("product_costs").select("product_id,cost")
+    sb.from("product_costs").select("product_id,cost"),
+    sb.from("product_variants").select("*")
   ]);
+  if (!v.error) setVariants(v.data);
   if (!p.error && p.data) ADMIN_PRODUCTS = p.data;
   if (!c.error) { COSTS = {}; (c.data || []).forEach(x => { COSTS[x.product_id] = Number(x.cost); }); }
   renderProductsList();
@@ -281,7 +297,7 @@ function categoryLabel(id) {
   return c ? c.label : id;
 }
 
-// ---------- perfumes: lista ----------
+// ---------- produtos: lista ----------
 const productList = $("productList");
 const productSearch = $("productSearch");
 const productCategoryFilter = $("productCategoryFilter");
@@ -317,7 +333,7 @@ function renderProductsList() {
   const units = active.reduce((s, p) => s + Math.max(0, stockOf(p)), 0);
   const value = active.reduce((s, p) => s + Math.max(0, stockOf(p)) * (COSTS[p.id] || 0), 0);
   $("statActive").textContent = active.length.toLocaleString("pt-BR");
-  $("catalogCtaSub").textContent = `${active.length} de ${ADMIN_PRODUCTS.length} perfumes do catálogo na sua lista`;
+  $("catalogCtaSub").textContent = `${active.length} de ${ADMIN_PRODUCTS.length} produtos do catálogo na sua lista`;
   $("statUnits").textContent = units.toLocaleString("pt-BR");
   $("statValue").textContent = Math.round(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -325,9 +341,9 @@ function renderProductsList() {
   const filtered = productSearch.value || productCategoryFilter.value;
   if (list.length === 0) {
     const EMPTY = {
-      active: `<strong>Sua lista está vazia</strong>Toque em "Escolher os perfumes que eu trabalho" e marque os que você vende.`,
+      active: `<strong>Sua lista está vazia</strong>Toque em "Escolher os produtos que eu trabalho" e marque os que você vende.`,
       stock: `<strong>Nada em estoque ainda</strong>Toque em "Chegou mercadoria" no Início para lançar o que comprou.`,
-      low: `<strong>Nada acabando</strong>Nenhum perfume que você trabalha está com ${LOW_STOCK} ou menos.`,
+      low: `<strong>Nada acabando</strong>Nenhum produto que você trabalha está com ${LOW_STOCK} ou menos.`,
       nostock: `<strong>Tudo com estoque</strong>`,
       noprice: `<strong>Todos têm preço</strong>`,
     };
@@ -348,6 +364,7 @@ function renderProductsList() {
               ${stockPill(p)}
               ${on ? "" : `<span class="pill pill-mute">Não trabalho</span>`}
             </span>
+            ${hasVariants(p.id) ? `<span class="row-opts">${escapeHtml(variantsOf(p.id).map(v => `${v.name}: ${v.stock}`).join("  ·  "))}</span>` : ""}
           </span>
         </button>
       </li>`;
@@ -439,7 +456,7 @@ function updateSelectionUI() {
   const n = selectedIds.size;
   bulkBar.hidden = !selecting;
   document.body.classList.toggle("has-bulk", selecting);
-  $("bulkCount").textContent = n === 0 ? "Toque nos perfumes para marcar" : plural(n, "selecionado", "selecionados");
+  $("bulkCount").textContent = n === 0 ? "Toque nos produtos para marcar" : plural(n, "selecionado", "selecionados");
   bulkBar.querySelectorAll(".bulk-btn").forEach(b => { b.disabled = n === 0; });
 }
 $("selectModeBtn").addEventListener("click", () => setSelecting(!selecting));
@@ -459,8 +476,8 @@ bulkBar.addEventListener("click", async (e) => {
   if (a === "entry") openEntry(ids);
   if (a === "hide") {
     const ok = await askConfirm({
-      title: ids.length === 1 ? "Tirar da sua lista?" : `Tirar ${ids.length} perfumes da sua lista?`,
-      text: "Saem de Perfumes, de Vender e do site, mas continuam no catálogo. Para voltar, use \"Escolher os perfumes que eu trabalho\".",
+      title: ids.length === 1 ? "Tirar da sua lista?" : `Tirar ${ids.length} produtos da sua lista?`,
+      text: "Saem de Produtos, de Vender e do site, mas continuam no catálogo. Para voltar, use \"Escolher os produtos que eu trabalho\".",
       yes: "Tirar", danger: false
     });
     if (ok) await setProductsActive(ids, false);
@@ -494,9 +511,9 @@ async function setProductsActive(ids, active, { quiet = false } = {}) {
     const note = noPrice ? ` ${noPrice === 1 ? "Está" : `${noPrice} estão`} sem preço: só aparece${noPrice === 1 ? "" : "m"} no site com preço.` : "";
     if (quiet) {
       const p = productById(ids[0]);
-      showToast((active ? `Trabalho: ${p?.name || "perfume"}.` : `Não trabalho: ${p?.name || "perfume"}. Saiu do site.`) + note);
+      showToast((active ? `Trabalho: ${p?.name || "produto"}.` : `Não trabalho: ${p?.name || "produto"}. Saiu do site.`) + note);
     } else {
-      showToast((active ? `${plural(ids.length, "perfume marcado", "perfumes marcados")} como Trabalho.` : `${plural(ids.length, "perfume marcado", "perfumes marcados")} como Não trabalho.`) + note);
+      showToast((active ? `${plural(ids.length, "produto marcado", "produtos marcados")} como Trabalho.` : `${plural(ids.length, "produto marcado", "produtos marcados")} como Não trabalho.`) + note);
     }
     HOOKS.data.forEach(fn => fn());
   } catch (err) {
@@ -506,7 +523,7 @@ async function setProductsActive(ids, active, { quiet = false } = {}) {
   }
 }
 
-// ---------- catálogo: escolher os perfumes que trabalho ----------
+// ---------- catálogo: escolher os produtos que trabalho ----------
 let catSel = new Set(), catOrig = new Set(), catCat = "", catOnlyMarked = false;
 function openCatalog() {
   catOrig = new Set(ADMIN_PRODUCTS.filter(isActive).map(p => p.id));
@@ -591,7 +608,7 @@ $("catalogSaveBtn").addEventListener("click", async () => {
     ADMIN_PRODUCTS.forEach(p => { if (add.includes(p.id)) p.active = true; if (rem.includes(p.id)) p.active = false; });
     closeSheet($("catalogOverlay"));
     const noPrice = add.filter(id => !hasPrice(productById(id))).length;
-    showToast(`Lista salva: ${plural(catSel.size, "perfume", "perfumes")}.${noPrice ? ` ${noPrice} sem preço só aparece${noPrice === 1 ? "" : "m"} no site com preço.` : ""}`);
+    showToast(`Lista salva: ${plural(catSel.size, "produto", "produtos")}.${noPrice ? ` ${noPrice} sem preço só aparece${noPrice === 1 ? "" : "m"} no site com preço.` : ""}`);
     setStatusFilter("active");
     HOOKS.data.forEach(fn => fn());
   } catch (err) {
@@ -603,7 +620,7 @@ $("catalogSaveBtn").addEventListener("click", async () => {
 async function deleteProducts(ids) {
   const names = ids.map(id => productById(id)?.name).filter(Boolean);
   const ok = await askConfirm({
-    title: ids.length === 1 ? "Excluir este perfume de vez?" : `Excluir ${ids.length} perfumes de vez?`,
+    title: ids.length === 1 ? "Excluir este produto de vez?" : `Excluir ${ids.length} produtos de vez?`,
     text: (ids.length === 1 ? `"${names[0]}" vai sumir do painel e do site, com estoque e histórico.` : `Eles vão sumir do painel e do site, com estoque e histórico.`) +
       ` Não dá para desfazer. Se você só não trabalha com ${ids.length === 1 ? "ele" : "eles"}, use "Não trabalho".`,
     yes: ids.length === 1 ? "Excluir" : `Excluir ${ids.length}`,
@@ -621,7 +638,7 @@ async function deleteProducts(ids) {
     ADMIN_PRODUCTS = ADMIN_PRODUCTS.filter(p => !ids.includes(p.id));
     if (selecting) setSelecting(false); else renderProductsList();
     HOOKS.data.forEach(fn => fn());
-    showToast(ids.length === 1 ? "Perfume excluído" : `${ids.length} perfumes excluídos`);
+    showToast(ids.length === 1 ? "Produto excluído" : `${ids.length} produtos excluídos`);
     return true;
   } catch (err) {
     showToast("Não deu para excluir: " + err.message);
@@ -630,13 +647,14 @@ async function deleteProducts(ids) {
   }
 }
 
-// ---------- perfume: formulário ----------
+// ---------- produto: formulário ----------
 const productModalOverlay = $("productModalOverlay");
 const productForm = $("productForm");
 const productIdInput = $("productId");
 const productNameInput = $("productName");
 const productPriceInput = $("productPrice");
 const productCostInput = $("productCost");
+const productDescInput = $("productDesc");
 const productCategorySelect = $("productCategory");
 const productActiveInput = $("productActive");
 const productInitialStock = $("productInitialStock");
@@ -644,6 +662,8 @@ const productImageFile = $("productImageFile");
 const productImagePreview = $("productImagePreview");
 const productSaveMsg = $("productSaveMsg");
 const productSaveBtn = $("productSaveBtn");
+const productHasOpts = $("productHasOpts");
+const optList = $("optList");
 
 $("newProductBtn").addEventListener("click", () => openProductModal(null));
 $("fabNewProduct").addEventListener("click", () => openProductModal(null));
@@ -661,25 +681,142 @@ function updateMarginLine() {
 productPriceInput.addEventListener("input", updateMarginLine);
 productCostInput.addEventListener("input", updateMarginLine);
 
+// categoria nova sem sair do cadastro
+function fillProductCategories(selected) {
+  productCategorySelect.innerHTML = ADMIN_CATEGORIES.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.label)}</option>`).join("");
+  if (selected && ADMIN_CATEGORIES.some(c => c.id === selected)) productCategorySelect.value = selected;
+}
+$("productNewCatBtn").addEventListener("click", () => {
+  const w = $("productNewCatWrap");
+  w.hidden = !w.hidden;
+  if (!w.hidden) $("productNewCatName").focus();
+});
+$("productNewCatName").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("productNewCatSave").click(); } });
+$("productNewCatSave").addEventListener("click", async () => {
+  const label = $("productNewCatName").value.trim();
+  if (!label) return $("productNewCatName").focus();
+  const id = slugify(label);
+  const found = ADMIN_CATEGORIES.find(c => c.id === id || normalizeText(c.label) === normalizeText(label));
+  if (found) {
+    productCategorySelect.value = found.id;
+  } else {
+    const btn = $("productNewCatSave");
+    btn.disabled = true;
+    const sort = ADMIN_CATEGORIES.reduce((m, c) => Math.max(m, Number(c.sort_order) || 0), -1) + 1;
+    const { error } = await sb.from("categories").insert({ id, label, sort_order: sort });
+    btn.disabled = false;
+    if (error) return showToast("Não deu para criar a categoria: " + error.message);
+    ADMIN_CATEGORIES.push({ id, label, sort_order: sort });
+    fillProductCategories(id);
+    renderCategoryFilterOptions();
+    renderCategoriesList();
+    showToast(`Categoria "${label}" criada`);
+  }
+  $("productNewCatName").value = "";
+  $("productNewCatWrap").hidden = true;
+});
+
+// ---------- opções (tamanho, voltagem, cor...) ----------
+function optRowHtml({ id = "", name = "", stock = null }) {
+  const old = !!id;
+  return `<li class="opt" data-vid="${escapeHtml(id)}">
+    <input type="text" class="opt-name" value="${escapeHtml(name)}" placeholder="Ex: M" aria-label="Nome da opção" maxlength="40">
+    ${old ? `<span class="opt-have"><b>${stock}</b>em estoque</span>`
+          : `<input type="number" class="opt-qty" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="Quantidade em estoque">`}
+    <button type="button" class="icon-btn" data-opt-del aria-label="Tirar opção"><svg class="i sm"><use href="#i-x"/></svg></button>
+  </li>`;
+}
+function renderOptHead() {
+  const has = optList.children.length > 0;
+  let head = $("optHead");
+  if (!head) {
+    head = document.createElement("div");
+    head.id = "optHead"; head.className = "opt-head";
+    head.innerHTML = `<span>OPÇÃO</span><span>QTD</span><span></span>`;
+    optList.before(head);
+  }
+  head.hidden = !has;
+}
+function addOptRows(names) {
+  const have = new Set([...optList.querySelectorAll(".opt-name")].map(i => normalizeText(i.value.trim())).filter(Boolean));
+  // linha vazia some quando entra um pronto
+  optList.querySelectorAll(".opt").forEach(li => { if (!li.dataset.vid && !li.querySelector(".opt-name").value.trim()) li.remove(); });
+  names.filter(n => !have.has(normalizeText(n))).forEach(n => optList.insertAdjacentHTML("beforeend", optRowHtml({ name: n })));
+  renderOptHead();
+  syncOptNote();
+}
+function syncOptNote() {
+  const id = productIdInput.value;
+  const p = id ? productById(id) : null;
+  const note = $("optNote");
+  if (p && !hasVariants(id) && stockOf(p) > 0 && productHasOpts.checked) {
+    note.hidden = false;
+    note.textContent = `Hoje tem ${stockOf(p)} sem opção. Ao salvar, o estoque passa a ser a soma das quantidades de cada opção.`;
+  } else note.hidden = true;
+}
+function setOptsMode(on) {
+  productHasOpts.checked = on;
+  $("productOpts").hidden = !on;
+  const isNew = !productIdInput.value;
+  $("productInitialStockWrap").hidden = !isNew || on;
+  if (on && !optList.children.length) addOptRows([""]);
+  syncOptNote();
+}
+productHasOpts.addEventListener("change", () => setOptsMode(productHasOpts.checked));
+$("optPresets").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-preset]");
+  if (b) addOptRows(b.dataset.preset.split(","));
+});
+$("optAddBtn").addEventListener("click", () => {
+  optList.insertAdjacentHTML("beforeend", optRowHtml({}));
+  renderOptHead();
+  optList.lastElementChild.querySelector(".opt-name").focus();
+});
+optList.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-opt-del]");
+  if (!b) return;
+  b.closest(".opt").remove();
+  renderOptHead();
+});
+function readOpts() {
+  return [...optList.querySelectorAll(".opt")].map((li, i) => {
+    const q = li.querySelector(".opt-qty");
+    return { id: li.dataset.vid || null, name: li.querySelector(".opt-name").value.trim(), qty: q && q.value !== "" ? Math.floor(Number(q.value)) : 0, sort_order: i };
+  }).filter(o => o.id || o.name);
+}
+
 const MOVE_LABEL = { entrada: "Entrada", venda: "Venda", ajuste: "Correção", cancelamento: "Venda cancelada" };
 async function loadProductMoves(id) {
   const ul = $("productMoves");
   ul.innerHTML = "";
-  const { data, error } = await sb.from("stock_moves").select("qty,kind,unit_cost,note,created_at")
+  const { data, error } = await sb.from("stock_moves").select("qty,kind,unit_cost,note,created_at,variant_name")
     .eq("product_id", id).order("created_at", { ascending: false }).limit(8);
   if (error || !data || productIdInput.value !== id) return;
   ul.innerHTML = data.map(m => {
     const when = new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-    const extra = [m.unit_cost != null ? `${formatBRL(m.unit_cost)}/un` : "", m.note || ""].filter(Boolean).join(" · ");
+    const extra = [m.variant_name || "", m.unit_cost != null ? `${formatBRL(m.unit_cost)}/un` : "", m.note || ""].filter(Boolean).join(" · ");
     return `<li><span>${when} · ${MOVE_LABEL[m.kind] || m.kind}${extra ? ` <small>${escapeHtml(extra)}</small>` : ""}</span>
       <span class="${m.qty > 0 ? "mv-in" : "mv-out"}">${m.qty > 0 ? "+" : ""}${m.qty}</span></li>`;
   }).join("");
+}
+function renderVarStock(id) {
+  const ul = $("productVarStock");
+  const vs = variantsOf(id);
+  ul.hidden = !vs.length;
+  ul.innerHTML = vs.map(v => `<li class="${v.stock > 0 ? "" : "zero"}">${escapeHtml(v.name)} · ${v.stock}</li>`).join("");
 }
 function refreshProductStockBox() {
   const id = productIdInput.value;
   const p = productById(id);
   if (!p || productModalOverlay.hidden) return;
   $("productStockNum").textContent = stockOf(p);
+  renderVarStock(id);
+  // atualiza o "em estoque" das opções que já existem, sem mexer no que está sendo digitado
+  optList.querySelectorAll(".opt[data-vid]").forEach(li => {
+    const v = variantById(li.dataset.vid);
+    const b = li.querySelector(".opt-have b");
+    if (v && b) b.textContent = v.stock;
+  });
   if (COSTS[id] != null && document.activeElement !== productCostInput) productCostInput.value = priceToInput(COSTS[id]);
   updateMarginLine();
   loadProductMoves(id);
@@ -689,33 +826,38 @@ HOOKS.data.push(refreshProductStockBox);
 function openProductModal(id) {
   productForm.reset();
   clearMsg(productSaveMsg);
-  productCategorySelect.innerHTML = ADMIN_CATEGORIES.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.label)}</option>`).join("");
+  $("productNewCatWrap").hidden = true;
+  optList.innerHTML = "";
+  fillProductCategories();
   if (id) {
     const p = productById(id);
-    $("productModalTitle").textContent = "Editar perfume";
+    $("productModalTitle").textContent = "Editar produto";
     productIdInput.value = p.id;
     productNameInput.value = p.name;
+    productDescInput.value = p.description || "";
     productPriceInput.value = hasPrice(p) ? priceToInput(p.price) : "";
     productCostInput.value = COSTS[p.id] != null ? priceToInput(COSTS[p.id]) : "";
     productCategorySelect.value = p.category;
     productActiveInput.checked = isActive(p);
     setPhoto(productImagePreview, p.img);
     $("productDeleteBtn").hidden = false;
-    $("productInitialStockWrap").hidden = true;
     $("productStockBox").hidden = false;
     $("productStockNum").textContent = stockOf(p);
+    variantsOf(p.id).forEach(v => optList.insertAdjacentHTML("beforeend", optRowHtml(v)));
+    renderVarStock(p.id);
     loadProductMoves(p.id);
   } else {
-    $("productModalTitle").textContent = "Novo perfume";
+    $("productModalTitle").textContent = "Novo produto";
     productIdInput.value = "";
     productActiveInput.checked = true;
     if (productCategoryFilter.value) productCategorySelect.value = productCategoryFilter.value;
     setPhoto(productImagePreview, "");
     $("productDeleteBtn").hidden = true;
-    $("productInitialStockWrap").hidden = false;
     $("productStockBox").hidden = true;
     $("productMoves").innerHTML = "";
   }
+  renderOptHead();
+  setOptsMode(!!id && hasVariants(id));
   updateMarginLine();
   syncPhotoLabels(productImagePreview, $("productPhotoEmpty"), $("productPhotoChange"));
   openSheet(productModalOverlay);
@@ -742,16 +884,45 @@ productForm.addEventListener("submit", async (e) => {
   if (costRaw && (!Number.isFinite(cost) || cost < 0)) return formError(productSaveMsg, "Custo inválido. Escreva só o valor, por exemplo 45,00.", productCostInput);
   const initial = productInitialStock.value === "" ? 0 : Math.floor(Number(productInitialStock.value));
   if (!Number.isFinite(initial) || initial < 0) return formError(productSaveMsg, "Quantidade inválida.", productInitialStock);
+  if (!productCategorySelect.value) return formError(productSaveMsg, "Escolha a categoria ou crie uma nova.", productCategorySelect);
   const id = productIdInput.value;
   let imgUrl = id ? productById(id).img : "";
   const file = productImageFile.files[0];
-  if (!imgUrl && !file) return formError(productSaveMsg, "Coloque uma foto do perfume.");
+  if (!imgUrl && !file) return formError(productSaveMsg, "Coloque uma foto do produto.");
+
+  // opções: o que fica, o que entra, o que sai
+  const useOpts = productHasOpts.checked;
+  const opts = useOpts ? readOpts() : [];
+  if (useOpts) {
+    if (!opts.length) return formError(productSaveMsg, "Coloque pelo menos uma opção, ou desligue \"Tem tamanhos ou opções\".");
+    const blank = opts.find(o => !o.name);
+    if (blank) return formError(productSaveMsg, "Tem opção sem nome. Escreva o nome ou tire a linha.");
+    const seen = new Set();
+    for (const o of opts) {
+      const k = normalizeText(o.name);
+      if (seen.has(k)) return formError(productSaveMsg, `A opção "${o.name}" está repetida.`);
+      seen.add(k);
+      if (!Number.isFinite(o.qty) || o.qty < 0) return formError(productSaveMsg, `Quantidade inválida em "${o.name}".`);
+    }
+  }
+  const before = id ? variantsOf(id) : [];
+  const keepIds = new Set(opts.filter(o => o.id).map(o => o.id));
+  const removed = before.filter(v => !keepIds.has(v.id));
+  const lostUnits = removed.reduce((n, v) => n + Number(v.stock), 0);
+  if (removed.length && lostUnits > 0) {
+    const ok = await askConfirm({
+      title: useOpts ? `Tirar ${removed.length === 1 ? `a opção ${removed[0].name}` : `${removed.length} opções`}?` : "Desligar as opções?",
+      text: `${plural(lostUnits, "unidade sai", "unidades saem")} do estoque (${removed.map(v => `${v.name}: ${v.stock}`).join(", ")}). O histórico de vendas continua.`,
+      yes: "Tirar mesmo"
+    });
+    if (!ok) return;
+  }
 
   productSaveBtn.disabled = true;
   productSaveBtn.textContent = file ? "Enviando foto…" : "Salvando…";
   try {
     if (file) imgUrl = await uploadImage(file, "produtos", { maxSize: 1000 });
-    const payload = { name: productNameInput.value.trim(), price, category: productCategorySelect.value, img: imgUrl, active: productActiveInput.checked };
+    const payload = { name: productNameInput.value.trim(), description: productDescInput.value.trim() || null, price, category: productCategorySelect.value, img: imgUrl, active: productActiveInput.checked };
     let productId = id;
     if (id) {
       const { error } = await sb.from("products").update(payload).eq("id", id);
@@ -765,15 +936,38 @@ productForm.addEventListener("submit", async (e) => {
       const { error } = await sb.from("product_costs").upsert({ product_id: productId, cost, updated_at: new Date().toISOString() });
       if (error) throw error;
     }
-    if (!id && initial > 0) {
-      const { error } = await sb.rpc("pdv_entrada", { p_items: [{ product_id: productId, qty: initial, unit_cost: cost }], p_note: "Estoque inicial" });
+    // opções
+    if (removed.length) {
+      const { error } = await sb.from("product_variants").delete().in("id", removed.map(v => v.id));
+      if (error) throw error;
+    }
+    for (const o of opts.filter(o => o.id)) {
+      const old = before.find(v => v.id === o.id);
+      if (old && (old.name !== o.name || old.sort_order !== o.sort_order)) {
+        const { error } = await sb.from("product_variants").update({ name: o.name, sort_order: o.sort_order }).eq("id", o.id);
+        if (error) throw error;
+      }
+    }
+    const fresh = opts.filter(o => !o.id);
+    let entries = [];
+    if (fresh.length) {
+      const { data, error } = await sb.from("product_variants")
+        .insert(fresh.map(o => ({ product_id: productId, name: o.name, stock: 0, sort_order: o.sort_order }))).select("id,name");
+      if (error) throw error;
+      entries = fresh.filter(o => o.qty > 0).map(o => ({ product_id: productId, variant_id: data.find(d => d.name === o.name).id, qty: o.qty, unit_cost: cost }));
+    } else if (!useOpts && !id && initial > 0) {
+      entries = [{ product_id: productId, qty: initial, unit_cost: cost }];
+    }
+    if (entries.length) {
+      const { error } = await sb.rpc("pdv_entrada", { p_items: entries, p_note: "Estoque inicial" });
       if (error) throw error;
     }
     closeSheet(productModalOverlay);
-    showToast(id ? "Perfume atualizado" : "Perfume cadastrado");
+    showToast(id ? "Produto atualizado" : "Produto cadastrado");
     await loadAllData();
   } catch (err) {
-    formError(productSaveMsg, "Não deu para salvar: " + err.message);
+    formError(productSaveMsg, /product_variants_uq|duplicate/.test(err.message) ? "Tem opção com nome repetido." : "Não deu para salvar: " + err.message);
+    await reloadProducts();
   } finally {
     productSaveBtn.disabled = false;
     productSaveBtn.textContent = "Salvar";
@@ -810,7 +1004,7 @@ async function uploadImage(raw, folder, { maxSize } = {}) {
 const categoriesList = $("categoriesList");
 function renderCategoriesList() {
   if (!ADMIN_CATEGORIES.length) {
-    categoriesList.innerHTML = `<li class="list-empty"><strong>Nenhuma categoria</strong>Crie uma para separar os perfumes no site.</li>`;
+    categoriesList.innerHTML = `<li class="list-empty"><strong>Nenhuma categoria</strong>Crie uma para separar os produtos no site.</li>`;
     return;
   }
   categoriesList.innerHTML = ADMIN_CATEGORIES.map(c => {
@@ -818,7 +1012,7 @@ function renderCategoriesList() {
     return `<li class="row" data-id="${escapeHtml(c.id)}">
       <button type="button" class="row-main" data-action="edit"><span class="row-text">
         <span class="row-name">${escapeHtml(c.label)}</span>
-        <span class="row-meta"><span>${plural(all.length, "perfume", "perfumes")}</span><span>· ${all.filter(isActive).length} trabalho</span><span>· ordem ${c.sort_order}</span></span>
+        <span class="row-meta"><span>${plural(all.length, "produto", "produtos")}</span><span>· ${all.filter(isActive).length} trabalho</span><span>· ordem ${c.sort_order}</span></span>
       </span></button>
       <div class="row-actions"><button type="button" class="icon-btn" data-action="delete" aria-label="Excluir categoria ${escapeHtml(c.label)}"><svg class="i sm"><use href="#i-trash"/></svg></button></div>
     </li>`;
@@ -868,7 +1062,7 @@ async function deleteCategory(id) {
   const c = ADMIN_CATEGORIES.find(c => c.id === id);
   const inUse = ADMIN_PRODUCTS.filter(p => p.category === id).length;
   if (inUse) {
-    await askConfirm({ title: "Essa categoria tem perfumes", text: `"${c ? c.label : id}" tem ${plural(inUse, "perfume", "perfumes")}. Mude eles de categoria antes.`, yes: "Entendi", no: null, danger: false });
+    await askConfirm({ title: "Essa categoria tem produtos", text: `"${c ? c.label : id}" tem ${plural(inUse, "produto", "produtos")}. Mude eles de categoria antes.`, yes: "Entendi", no: null, danger: false });
     return;
   }
   if (!await askConfirm({ title: "Excluir categoria?", text: `"${c ? c.label : ""}" vai sair do site.` })) return;
@@ -955,6 +1149,8 @@ function fillSettingsForm() {
   $("settingStoreName").value = ADMIN_SETTINGS.store_name || "";
   $("settingWhatsapp").value = ADMIN_SETTINGS.whatsapp_number || "";
   $("settingInstagram").value = ADMIN_SETTINGS.instagram || "";
+  $("settingTagline").value = ADMIN_SETTINGS.store_tagline || "";
+  $("settingPromo").value = ADMIN_SETTINGS.promo_text || "";
   setPhoto($("settingLogoPreview"), ADMIN_SETTINGS.logo_url || "assets/logo/logo.png");
   $("settingMsgBuy").value = ADMIN_SETTINGS.whatsapp_msg_buy || DEFAULT_MSG_BUY;
   $("settingMsgCart").value = ADMIN_SETTINGS.whatsapp_msg_cart || DEFAULT_MSG_CART;
@@ -964,9 +1160,9 @@ function fillSettingsForm() {
 function updateOnlyStockHint() {
   const shown = ADMIN_PRODUCTS.filter(p => isActive(p) && hasPrice(p) && (!settingOnlyStock.checked || stockOf(p) > 0)).length;
   $("onlyStockHint").textContent = settingOnlyStock.checked
-    ? `Ligado: o site mostra ${plural(shown, "perfume", "perfumes")}. O que zerar some sozinho e volta quando der entrada.`
-    : `Desligado: o site mostra os ${plural(shown, "perfume", "perfumes")} de Trabalho com preço, com ou sem estoque.`;
-  $("tileSite").textContent = `${plural(shown, "perfume", "perfumes")} no site`;
+    ? `Ligado: o site mostra ${plural(shown, "produto", "produtos")}. O que zerar some sozinho e volta quando der entrada.`
+    : `Desligado: o site mostra os ${plural(shown, "produto", "produtos")} de Trabalho com preço, com ou sem estoque.`;
+  $("tileSite").textContent = `${plural(shown, "produto", "produtos")} no site`;
 }
 HOOKS.data.push(updateOnlyStockHint);
 settingOnlyStock.addEventListener("change", async () => {
@@ -977,7 +1173,7 @@ settingOnlyStock.addEventListener("change", async () => {
   if (error) { settingOnlyStock.checked = !on; return showToast("Não deu para salvar: " + error.message); }
   ADMIN_SETTINGS.site_only_in_stock = on ? "true" : "false";
   updateOnlyStockHint();
-  showToast(on ? "Site mostra só o que tem em estoque" : "Site mostra todos os perfumes de Trabalho");
+  showToast(on ? "Site mostra só o que tem em estoque" : "Site mostra todos os produtos de Trabalho");
 });
 $("settingLogoFile").addEventListener("change", () => {
   const f = $("settingLogoFile").files[0];
@@ -997,6 +1193,8 @@ $("settingsForm").addEventListener("submit", async (e) => {
       { key: "whatsapp_number", value: onlyDigits($("settingWhatsapp").value) },
       { key: "instagram", value: $("settingInstagram").value.trim().replace(/^@/, "") },
       { key: "logo_url", value: logo },
+      { key: "store_tagline", value: $("settingTagline").value.trim() },
+      { key: "promo_text", value: $("settingPromo").value.trim() },
       { key: "whatsapp_msg_buy", value: $("settingMsgBuy").value.trim() || DEFAULT_MSG_BUY },
       { key: "whatsapp_msg_cart", value: $("settingMsgCart").value.trim() || DEFAULT_MSG_CART }
     ];

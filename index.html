@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Líder Store | Catálogo de Perfumes</title>
-<meta name="description" content="Líder Store - Perfumes e miniaturas importadas. Faça seu pedido pelo WhatsApp.">
+<title>Líder Store | Catálogo</title>
+<meta name="description" content="Líder Store - Perfumes, camisas de time, eletrônicos e muito mais. Faça seu pedido pelo WhatsApp.">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/logo/favicon-32.png">
 <link rel="icon" type="image/png" sizes="512x512" href="assets/logo/logo-icon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/logo/apple-touch-icon.png">
@@ -18,7 +18,7 @@
       <img src="assets/logo/logo.png" alt="Líder Store" class="brand-logo">
       <div class="brand-text">
         <span class="brand-name">Líder Store</span>
-        <span class="brand-tagline">Perfumes &amp; Miniaturas Importadas</span>
+        <span class="brand-tagline" data-tagline>Perfumes, camisas de time, eletrônicos e muito mais</span>
       </div>
     </div>
 
@@ -37,7 +37,7 @@
       <circle cx="11" cy="11" r="7"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
-    <input type="text" id="searchInput" class="search-input" placeholder="Buscar perfume pelo nome...">
+    <input type="text" id="searchInput" class="search-input" placeholder="Buscar produto pelo nome...">
     <button class="search-clear" id="searchClear" type="button" aria-label="Limpar busca" hidden>&times;</button>
   </div>
 </header>
@@ -49,8 +49,8 @@
   <div class="banner-dots" id="bannerDots"></div>
 </section>
 
-<div class="promo-strip">
-  <span class="promo-strip-text"><strong>3 frascos por R$ 270</strong> — estoque limitado da promoção, garanta o seu pelo WhatsApp</span>
+<div class="promo-strip" id="promoStrip" hidden>
+  <span class="promo-strip-text" id="promoText"></span>
 </div>
 
 <nav class="category-bar">
@@ -64,14 +64,14 @@
   </div>
 
   <div class="product-grid" id="productGrid"></div>
-  <p class="search-empty" id="searchEmpty" hidden>Nenhum perfume encontrado. Tente buscar por outro nome.</p>
+  <p class="search-empty" id="searchEmpty" hidden>Nenhum produto encontrado. Tente buscar por outro nome.</p>
 </main>
 
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-col">
       <img src="assets/logo/logo.png" alt="Líder Store" class="footer-logo">
-      <p>Perfumes &amp; Miniaturas Importadas.</p>
+      <p data-tagline>Perfumes, camisas de time, eletrônicos e muito mais</p>
     </div>
     <div class="footer-col">
       <h3>Entre em contato</h3>
@@ -121,6 +121,11 @@
       <div class="product-modal-badges" id="modalBadges"></div>
       <h2 class="product-modal-name" id="modalName"></h2>
       <div class="product-modal-price" id="modalPrice"></div>
+      <p class="product-modal-desc" id="modalDesc" hidden></p>
+      <div class="modal-options" id="modalOptionsWrap" hidden>
+        <span class="modal-options-label" id="modalOptionsLabel">Escolha a opção</span>
+        <div class="modal-options-list" id="modalOptions" role="radiogroup" aria-labelledby="modalOptionsLabel"></div>
+      </div>
       <div class="product-modal-details" id="modalDetails"></div>
       <div class="product-modal-actions">
         <button class="btn btn-add" id="modalAddBtn">Adicionar ao carrinho</button>

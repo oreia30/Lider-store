@@ -275,8 +275,8 @@ $("cvRemindBtn").addEventListener("click", () => {
   if (!c || !c.phone) return;
   const first = c.name.split(" ")[0];
   const text = s.late > 0
-    ? `Oi, ${first}! Tudo bem? Aqui é da ${storeName()}. Passando para lembrar que tem ${formatBRL(s.late)} vencido do seu perfume a prazo${s.oldestLate ? ` (desde ${dm(s.oldestLate.due)})` : ""}. Pode me mandar o Pix quando der? Obrigado!`
-    : `Oi, ${first}! Tudo bem? Aqui é da ${storeName()}. Só lembrando da próxima parcela do seu perfume: ${formatBRL(Number(s.next.amount) - Number(s.next.paid))} em ${dm(s.next.due)}. Obrigado!`;
+    ? `Oi, ${first}! Tudo bem? Aqui é da ${storeName()}. Passando para lembrar que tem ${formatBRL(s.late)} vencido da sua compra a prazo${s.oldestLate ? ` (desde ${dm(s.oldestLate.due)})` : ""}. Pode me mandar o Pix quando der? Obrigado!`
+    : `Oi, ${first}! Tudo bem? Aqui é da ${storeName()}. Só lembrando da próxima parcela da sua compra: ${formatBRL(Number(s.next.amount) - Number(s.next.paid))} em ${dm(s.next.due)}. Obrigado!`;
   window.open(waLink(c.phone, text), "_blank");
 });
 $("cvBody").addEventListener("click", (e) => {

@@ -37,8 +37,21 @@ function findProduct(id) {
   return PRODUCTS.find(p => p.id === id);
 }
 
-function addToCart(id, qty = 1) {
-  cart[id] = (cart[id] || 0) + qty;
+// chave do carrinho: id do produto, ou "id|opção" quando tem tamanho/opção
+const cartKey = (pid, vid) => (vid ? `${pid}|${vid}` : pid);
+function parseKey(key) {
+  const [pid, vid] = String(key).split("|");
+  const p = findProduct(pid);
+  const v = p && vid ? (p.variants || []).find(x => x.id === vid) : null;
+  const ok = !!p && (vid ? !!v : !(p.variants || []).length);
+  return { p, v, ok };
+}
+const hasOptions = (p) => !!(p && p.variants && p.variants.length);
+const itemName = (p, v) => (v ? `${p.name} (${v.name})` : p.name);
+
+function addToCart(id, qty = 1, vid = null) {
+  const key = cartKey(id, vid);
+  cart[key] = (cart[key] || 0) + qty;
   saveCart(cart);
   renderCart();
   showToast("Produto adicionado ao carrinho");
@@ -65,10 +78,15 @@ function cartCount() {
 }
 
 function cartTotal() {
-  return Object.entries(cart).reduce((sum, [id, q]) => {
-    const p = findProduct(id);
-    return p ? sum + p.price * q : sum;
+  return Object.entries(cart).reduce((sum, [key, q]) => {
+    const { p, ok } = parseKey(key);
+    return ok ? sum + p.price * q : sum;
   }, 0);
+}
+function pruneCart() {
+  let changed = false;
+  Object.keys(cart).forEach(k => { if (!parseKey(k).ok) { delete cart[k]; changed = true; } });
+  if (changed) saveCart(cart);
 }
 
 // ==== DADOS DA LOJA (Supabase) ====
@@ -76,7 +94,7 @@ let PRODUCTS = [];
 let CATEGORIES = [];
 let SETTINGS = {};
 let BANNERS = [];
-let currentCategory = null;
+let currentCategory = ""; // "" = Tudo
 let searchQuery = "";
 
 // ==== RENDER PRODUTOS ====
@@ -100,10 +118,12 @@ function currentProducts() {
     const q = normalizeText(searchQuery);
     return PRODUCTS.filter(p => normalizeText(p.name).includes(q));
   }
+  if (!currentCategory) return PRODUCTS;
   return PRODUCTS.filter(p => p.category === currentCategory);
 }
 
 function categoryLabel(id) {
+  if (!id) return "Todos os produtos";
   const cat = CATEGORIES.find(c => c.id === id);
   return cat ? cat.label : "Produtos";
 }
@@ -128,6 +148,7 @@ function renderProducts() {
       <div class="product-info">
         <div class="product-name">${escapeHtml(p.name)}</div>
         <div class="product-price">${formatBRL(p.price)}</div>
+        ${hasOptions(p) ? `<div class="product-options-hint">${escapeHtml(p.variants.map(v => v.name).join(" · "))}</div>` : ""}
         <div class="product-actions">
           <button class="btn btn-add" data-action="add" data-id="${p.id}">Adicionar</button>
           <button class="btn btn-buy" data-action="buy" data-id="${p.id}">Comprar</button>
@@ -150,7 +171,10 @@ productGrid.addEventListener("click", (e) => {
   const product = findProduct(id);
   if (!product) return;
 
-  if (btn && btn.dataset.action === "add") {
+  // com tamanho/opção: abre o produto para escolher antes
+  if (btn && hasOptions(product)) {
+    openProductModal(product, { needPick: true });
+  } else if (btn && btn.dataset.action === "add") {
     addToCart(id, 1);
   } else if (btn && btn.dataset.action === "buy") {
     buyDirect(product);
@@ -184,8 +208,9 @@ if (searchClear) {
 // ==== FILTRO DE CATEGORIA (dinâmico) ====
 function renderCategoryChips() {
   if (!categoryBarInner) return;
-  categoryBarInner.innerHTML = CATEGORIES.map(c => `
-    <button class="category-chip${c.id === currentCategory ? " active" : ""}" type="button" data-category="${c.id}">${escapeHtml((c.label || "").toUpperCase())}</button>
+  const chips = CATEGORIES.length > 1 ? [{ id: "", label: "Tudo" }, ...CATEGORIES] : CATEGORIES;
+  categoryBarInner.innerHTML = chips.map(c => `
+    <button class="category-chip${c.id === currentCategory ? " active" : ""}" type="button" data-category="${escapeHtml(c.id)}">${escapeHtml((c.label || "").toUpperCase())}</button>
   `).join("");
 
   categoryBarInner.querySelectorAll(".category-chip[data-category]").forEach(chip => {
@@ -214,10 +239,10 @@ function whatsappLink(message) {
   return `https://wa.me/${CONFIG.whatsappNumber}?text=${encodeURIComponent(message)}`;
 }
 
-function buyDirect(product) {
+function buyDirect(product, variant = null) {
   const tpl = SETTINGS.whatsapp_msg_buy || DEFAULT_MSG_BUY;
   const message = fillTemplate(tpl, {
-    produto: product.name,
+    produto: itemName(product, variant),
     preco: formatBRL(product.price),
     total: formatBRL(product.price)
   });
@@ -229,10 +254,10 @@ function checkoutCart() {
   if (items.length === 0) return;
 
   let itensText = "";
-  items.forEach(([id, qty]) => {
-    const p = findProduct(id);
-    if (!p) return;
-    itensText += `${qty}x ${p.name} - ${formatBRL(p.price * qty)}\n`;
+  items.forEach(([key, qty]) => {
+    const { p, v, ok } = parseKey(key);
+    if (!ok) return;
+    itensText += `${qty}x ${itemName(p, v)} - ${formatBRL(p.price * qty)}\n`;
   });
 
   const tpl = SETTINGS.whatsapp_msg_cart || DEFAULT_MSG_CART;
@@ -264,19 +289,20 @@ function renderCart() {
 
   cartFooterEl.style.display = "block";
   cartItemsEl.innerHTML = entries.map(([id, qty]) => {
-    const p = findProduct(id);
-    if (!p) return "";
+    const { p, v, ok } = parseKey(id);
+    if (!ok) return "";
     return `
-      <div class="cart-item" data-id="${id}">
+      <div class="cart-item" data-id="${escapeHtml(id)}">
         <img src="${p.img}" alt="${escapeHtml(p.name)}">
         <div class="cart-item-info">
           <div class="cart-item-name">${escapeHtml(p.name)}</div>
+          ${v ? `<div class="cart-item-opt">${escapeHtml(v.name)}</div>` : ""}
           <div class="cart-item-price">${formatBRL(p.price)}</div>
           <div class="qty-control">
-            <button class="qty-btn" data-action="dec" data-id="${id}">−</button>
+            <button class="qty-btn" data-action="dec" data-id="${escapeHtml(id)}" aria-label="Menos">−</button>
             <span class="qty-value">${qty}</span>
-            <button class="qty-btn" data-action="inc" data-id="${id}">+</button>
-            <button class="cart-item-remove" data-action="remove" data-id="${id}">Remover</button>
+            <button class="qty-btn" data-action="inc" data-id="${escapeHtml(id)}" aria-label="Mais">+</button>
+            <button class="cart-item-remove" data-action="remove" data-id="${escapeHtml(id)}">Remover</button>
           </div>
         </div>
       </div>
@@ -329,7 +355,11 @@ const modalBadges = document.getElementById("modalBadges");
 const modalDetails = document.getElementById("modalDetails");
 const modalAddBtn = document.getElementById("modalAddBtn");
 const modalBuyBtn = document.getElementById("modalBuyBtn");
+const modalDesc = document.getElementById("modalDesc");
+const modalOptionsWrap = document.getElementById("modalOptionsWrap");
+const modalOptions = document.getElementById("modalOptions");
 let modalProductId = null;
+let modalVariantId = null;
 
 function extractDetails(name) {
   const details = {};
@@ -347,8 +377,21 @@ function extractDetails(name) {
   return details;
 }
 
-function openProductModal(product) {
+function openProductModal(product, { needPick = false } = {}) {
   modalProductId = product.id;
+  modalVariantId = null;
+  if (modalDesc) {
+    modalDesc.textContent = product.description || "";
+    modalDesc.hidden = !product.description;
+  }
+  if (modalOptionsWrap) {
+    const opts = product.variants || [];
+    modalOptionsWrap.hidden = !opts.length;
+    modalOptionsWrap.classList.toggle("is-missing", false);
+    modalOptions.innerHTML = opts.map(v => `<button type="button" class="opt-chip" role="radio" aria-checked="false" data-vid="${v.id}">${escapeHtml(v.name)}</button>`).join("");
+    if (opts.length === 1) { modalVariantId = opts[0].id; modalOptions.firstElementChild.setAttribute("aria-checked", "true"); }
+    if (needPick && opts.length > 1) setTimeout(() => showToast("Escolha a opção antes"), 150);
+  }
   modalImg.src = product.img;
   modalImg.alt = product.name;
   modalName.textContent = product.name;
@@ -391,17 +434,38 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+if (modalOptions) {
+  modalOptions.addEventListener("click", (e) => {
+    const b = e.target.closest(".opt-chip");
+    if (!b || b.disabled) return;
+    modalVariantId = b.dataset.vid;
+    modalOptions.querySelectorAll(".opt-chip").forEach(c => c.setAttribute("aria-checked", c === b ? "true" : "false"));
+    modalOptionsWrap.classList.remove("is-missing");
+  });
+}
+// produto com opção só segue depois de escolher
+function modalPick() {
+  const product = findProduct(modalProductId);
+  if (!product) return null;
+  if (!hasOptions(product)) return { product, variant: null };
+  const variant = product.variants.find(v => v.id === modalVariantId);
+  if (!variant) {
+    modalOptionsWrap.classList.add("is-missing");
+    showToast("Escolha a opção antes");
+    return null;
+  }
+  return { product, variant };
+}
 if (modalAddBtn) {
   modalAddBtn.addEventListener("click", () => {
-    if (!modalProductId) return;
-    addToCart(modalProductId, 1);
+    const pick = modalPick();
+    if (pick) addToCart(pick.product.id, 1, pick.variant ? pick.variant.id : null);
   });
 }
 if (modalBuyBtn) {
   modalBuyBtn.addEventListener("click", () => {
-    if (!modalProductId) return;
-    const product = findProduct(modalProductId);
-    if (product) buyDirect(product);
+    const pick = modalPick();
+    if (pick) buyDirect(pick.product, pick.variant);
   });
 }
 
@@ -432,7 +496,21 @@ function applySettings() {
     document.querySelectorAll(".brand-logo, .footer-logo").forEach(img => img.src = SETTINGS.logo_url);
   }
   document.querySelectorAll(".brand-name").forEach(el => el.textContent = CONFIG.storeName);
-  document.title = `${CONFIG.storeName} | Catálogo de Perfumes`;
+  document.title = `${CONFIG.storeName} | Catálogo`;
+  if (SETTINGS.store_tagline) {
+    document.querySelectorAll("[data-tagline]").forEach(el => el.textContent = SETTINGS.store_tagline);
+  }
+  // faixa de promoção: some quando está vazia
+  const promoStrip = document.getElementById("promoStrip");
+  const promoText = document.getElementById("promoText");
+  const promo = (SETTINGS.promo_text || "").trim();
+  if (promoStrip && promoText) {
+    promoStrip.hidden = !promo;
+    const cut = promo.indexOf(" — ");
+    promoText.innerHTML = cut > 0
+      ? `<strong>${escapeHtml(promo.slice(0, cut))}</strong>${escapeHtml(promo.slice(cut))}`
+      : escapeHtml(promo);
+  }
 
   const footerWhatsLink = document.getElementById("footerWhatsLink");
   if (footerWhatsLink) {
@@ -525,31 +603,41 @@ function initBannerCarousel() {
 // ==== CARREGAR DADOS DO SUPABASE ====
 async function loadStoreData() {
   try {
-    const [prodRes, catRes, settRes, bannerRes] = await Promise.all([
+    const [prodRes, catRes, settRes, bannerRes, varRes] = await Promise.all([
       sb.from("products").select("*").eq("active", true).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
       sb.from("categories").select("*").order("sort_order", { ascending: true }),
       sb.from("settings").select("*"),
-      sb.from("banners").select("*").order("sort_order", { ascending: true })
+      sb.from("banners").select("*").order("sort_order", { ascending: true }),
+      sb.from("product_variants").select("id,product_id,name,stock,sort_order").order("sort_order", { ascending: true })
     ]);
 
     // Ajustes > "Mostrar no site só o que tem em estoque"
     const onlyInStock = (settRes.data || []).some(s => s.key === "site_only_in_stock" && s.value === "true");
     // sem preço nunca aparece (evita "R$ 0,00" no site)
+    // opções (tamanho, voltagem...): com "só estoque" ligado, a opção zerada some
+    const VARS = {};
+    (varRes.data || []).forEach(v => {
+      if (onlyInStock && Number(v.stock) <= 0) return;
+      (VARS[v.product_id] = VARS[v.product_id] || []).push({ id: v.id, name: v.name });
+    });
     PRODUCTS = (prodRes.data || []).filter(p => Number(p.price) > 0 && (!onlyInStock || Number(p.stock) > 0)).map(p => ({
       id: p.id,
       name: p.name,
       price: Number(p.price),
       img: p.img,
-      category: p.category
+      category: p.category,
+      description: (p.description || "").trim(),
+      variants: VARS[p.id] || []
     }));
-    // só mostra categorias que têm perfume aparecendo no site
+    // só mostra categorias que têm produto aparecendo no site
     const usedCategories = new Set(PRODUCTS.map(p => p.category));
     CATEGORIES = (catRes.data || []).filter(c => usedCategories.has(c.id));
     SETTINGS = {};
     (settRes.data || []).forEach(s => { SETTINGS[s.key] = s.value; });
     BANNERS = bannerRes.data || [];
 
-    currentCategory = CATEGORIES[0] ? CATEGORIES[0].id : null;
+    currentCategory = CATEGORIES.length === 1 ? CATEGORIES[0].id : "";
+    pruneCart();
 
     applySettings();
     renderCategoryChips();

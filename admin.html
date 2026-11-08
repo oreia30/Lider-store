@@ -23,7 +23,7 @@
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></symbol>
-    <symbol id="i-bottle" viewBox="0 0 24 24"><path d="M10 2h4v3h-4zM9 5h6v2l2 2v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9l2-2z"/><path d="M7 13h10"/></symbol>
+    <symbol id="i-bottle" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></symbol>
     <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
     <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></symbol>
@@ -97,7 +97,7 @@
       <button class="side-item" data-view="inicio"><svg class="i sm"><use href="#i-home"/></svg>Início</button>
       <button class="side-item" data-view="vendas"><svg class="i sm"><use href="#i-receipt"/></svg>Vendas</button>
       <p class="side-group"><svg class="i xs"><use href="#i-spark"/></svg>Loja</p>
-      <button class="side-item" data-view="produtos"><svg class="i sm"><use href="#i-bottle"/></svg>Perfumes e estoque</button>
+      <button class="side-item" data-view="produtos"><svg class="i sm"><use href="#i-bottle"/></svg>Produtos e estoque</button>
       <button class="side-item" data-view="prazo"><svg class="i sm"><use href="#i-hand"/></svg>Prazo e clientes<span class="side-badge" data-badge="prazo" hidden></span></button>
       <button class="side-item" data-view="maquininha"><svg class="i sm"><use href="#i-card"/></svg>Simulador da maquininha</button>
       <p class="side-group"><svg class="i xs"><use href="#i-spark"/></svg>Site</p>
@@ -140,7 +140,7 @@
         <button class="quick-btn" data-view="vender"><svg class="i"><use href="#i-bag"/></svg>Nova venda</button>
         <button class="quick-btn" data-view="prazo"><svg class="i"><use href="#i-hand"/></svg>Receber</button>
         <button class="quick-btn" data-quick="entrada"><svg class="i"><use href="#i-box-in"/></svg>Chegou mercadoria</button>
-        <button class="quick-btn" data-quick="novo"><svg class="i"><use href="#i-plus"/></svg>Novo perfume</button>
+        <button class="quick-btn" data-quick="novo"><svg class="i"><use href="#i-plus"/></svg>Novo produto</button>
       </div>
 
       <div class="sec-head"><p class="kicker"><svg class="i xs"><use href="#i-spark"/></svg>Precisa de atenção</p></div>
@@ -152,18 +152,18 @@
       </div>
     </section>
 
-    <!-- PERFUMES -->
+    <!-- PRODUTOS -->
     <section class="view" id="view-produtos" hidden>
       <div class="page-head">
-        <h2 class="h-display">Perfumes</h2>
+        <h2 class="h-display">Produtos</h2>
         <div class="page-actions">
           <button class="btn btn-ghost" id="selectModeBtn"><svg class="i sm"><use href="#i-select"/></svg><span>Selecionar</span></button>
-          <button class="btn btn-cta" id="newProductBtn"><svg class="i sm"><use href="#i-plus"/></svg><span>Novo perfume</span></button>
+          <button class="btn btn-cta" id="newProductBtn"><svg class="i sm"><use href="#i-plus"/></svg><span>Novo produto</span></button>
         </div>
       </div>
       <button type="button" class="pick-cta" id="openCatalogBtn">
         <span class="pick-cta-ic"><svg class="i"><use href="#i-select"/></svg></span>
-        <span class="cc-text"><strong>Escolher os perfumes que eu trabalho</strong><small id="catalogCtaSub">Marque no catálogo o que você vende</small></span>
+        <span class="cc-text"><strong>Escolher os produtos que eu trabalho</strong><small id="catalogCtaSub">Marque no catálogo o que você vende</small></span>
         <svg class="i sm"><use href="#i-chev"/></svg>
       </button>
       <div class="stats3">
@@ -173,7 +173,7 @@
       </div>
       <div class="toolbar">
         <label class="search"><svg class="i sm"><use href="#i-search"/></svg>
-          <input type="search" id="productSearch" placeholder="Buscar perfume" autocomplete="off" enterkeyhint="search"></label>
+          <input type="search" id="productSearch" placeholder="Buscar produto" autocomplete="off" enterkeyhint="search"></label>
         <select id="productCategoryFilter" aria-label="Categoria"><option value="">Todas as categorias</option></select>
       </div>
       <div class="chips" role="tablist" aria-label="Filtrar" id="statusFilter">
@@ -198,7 +198,7 @@
       <div class="sell-left">
         <div class="page-head desktop-only"><h2 class="h-display">Vender</h2></div>
         <label class="search"><svg class="i sm"><use href="#i-search"/></svg>
-          <input type="search" id="sellSearch" placeholder="Buscar perfume" autocomplete="off" enterkeyhint="search"></label>
+          <input type="search" id="sellSearch" placeholder="Buscar produto" autocomplete="off" enterkeyhint="search"></label>
         <div class="chips" id="sellCats" aria-label="Categorias"></div>
         <div class="pgrid" id="sellGrid"></div>
       </div>
@@ -363,10 +363,12 @@
           <label class="field"><span class="lbl">Nome da loja</span><input type="text" id="settingStoreName"></label>
           <label class="field"><span class="lbl">WhatsApp da loja</span><input type="tel" id="settingWhatsapp" placeholder="5532999999999" inputmode="numeric"><small class="hint">Com 55 + DDD, só números.</small></label>
           <label class="field"><span class="lbl">Instagram</span><input type="text" id="settingInstagram" placeholder="liderstoresf" autocapitalize="off"><small class="hint">Sem o @.</small></label>
+          <label class="field"><span class="lbl">Frase da loja</span><input type="text" id="settingTagline" placeholder="Perfumes, camisas de time, eletrônicos e muito mais"><small class="hint">Aparece embaixo do nome, no topo e no rodapé do site.</small></label>
           <div class="field"><span class="lbl">Logo da loja</span>
             <label class="photo photo-sm"><img id="settingLogoPreview" alt="Logo atual"><span class="photo-change">Trocar</span><input type="file" id="settingLogoFile" accept="image/*"></label>
           </div>
         </div>
+        <label class="field"><span class="lbl">Faixa de promoção</span><input type="text" id="settingPromo" placeholder="Ex: 3 frascos por R$ 270 — garanta o seu pelo WhatsApp"><small class="hint">A parte antes do travessão (—) fica em destaque. Deixe vazio para esconder a faixa.</small></label>
         <label class="field"><span class="lbl">Mensagem do botão "Comprar"</span><textarea id="settingMsgBuy" rows="4"></textarea><small class="hint">Use {produto}, {preco} e {total}.</small></label>
         <label class="field"><span class="lbl">Mensagem do carrinho</span><textarea id="settingMsgCart" rows="5"></textarea><small class="hint">Use {loja}, {itens} e {total}.</small></label>
         <div class="form-end"><p class="msg" id="settingsSaveMsg"></p><button type="submit" class="btn btn-cta" id="settingsSaveBtn">Salvar</button></div>
@@ -418,17 +420,17 @@
   <!-- menu inferior (celular) -->
   <nav class="bnav" aria-label="Seções">
     <button class="bnav-item" data-view="inicio"><svg class="i"><use href="#i-home"/></svg><span>Início</span></button>
-    <button class="bnav-item" data-view="produtos"><svg class="i"><use href="#i-bottle"/></svg><span>Perfumes</span></button>
+    <button class="bnav-item" data-view="produtos"><svg class="i"><use href="#i-bottle"/></svg><span>Produtos</span></button>
     <button class="bnav-item bnav-sell" data-view="vender"><span class="sell-orb"><svg class="i"><use href="#i-bag"/></svg><b class="sell-count" id="sellCount" hidden>0</b></span><span>Vender</span></button>
     <button class="bnav-item" data-view="vendas"><svg class="i"><use href="#i-receipt"/></svg><span>Vendas</span></button>
     <button class="bnav-item" data-view="mais"><svg class="i"><use href="#i-grid"/></svg><span>Mais</span><span class="bnav-dot" data-badge="prazo" hidden></span></button>
   </nav>
 
-  <button class="fab" id="fabNewProduct" aria-label="Novo perfume" hidden><svg class="i"><use href="#i-plus"/></svg></button>
+  <button class="fab" id="fabNewProduct" aria-label="Novo produto" hidden><svg class="i"><use href="#i-plus"/></svg></button>
 
   <div class="cart-bar" id="cartBar" hidden>
     <button type="button" class="cart-bar-btn" id="cartOpenBtn">
-      <span class="cart-bar-info"><strong id="cartBarCount">0 perfumes</strong><span class="num" id="cartBarTotal">R$ 0,00</span></span>
+      <span class="cart-bar-info"><strong id="cartBarCount">0 itens</strong><span class="num" id="cartBarTotal">R$ 0,00</span></span>
       <span class="cart-bar-go">Fechar venda<svg class="i sm"><use href="#i-chev"/></svg></span>
     </button>
   </div>
@@ -448,11 +450,11 @@
 
 <!-- ======== FOLHAS ======== -->
 
-<!-- Perfume -->
+<!-- Produto -->
 <div class="overlay" id="productModalOverlay" hidden>
   <form class="sheet" id="productForm" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
     <div class="sheet-head"><span class="grab"></span>
-      <h2 class="h-display" id="productModalTitle">Novo perfume</h2>
+      <h2 class="h-display" id="productModalTitle">Novo produto</h2>
       <button type="button" class="icon-btn" data-close aria-label="Fechar"><svg class="i sm"><use href="#i-x"/></svg></button></div>
     <div class="sheet-body">
       <input type="hidden" id="productId">
@@ -462,13 +464,41 @@
         <span class="photo-change" id="productPhotoChange">Trocar foto</span>
         <input type="file" id="productImageFile" accept="image/*">
       </label>
-      <label class="field"><span class="lbl">Nome</span><input type="text" id="productName" required placeholder="Ex: 232 Stronger With You - 25ml"></label>
-      <label class="field"><span class="lbl">Categoria</span><select id="productCategory" required></select></label>
+      <label class="field"><span class="lbl">Nome</span><input type="text" id="productName" required placeholder="Ex: Camisa Flamengo 2026"></label>
+      <div class="field">
+        <div class="row-between"><label class="lbl" for="productCategory">Categoria</label>
+          <button type="button" class="link" id="productNewCatBtn"><svg class="i xs"><use href="#i-plus"/></svg>Nova categoria</button></div>
+        <select id="productCategory" required></select>
+        <div class="newcat" id="productNewCatWrap" hidden>
+          <input type="text" id="productNewCatName" placeholder="Ex: Eletrônicos" aria-label="Nome da nova categoria" enterkeyhint="done">
+          <button type="button" class="btn btn-ghost" id="productNewCatSave">Criar</button>
+        </div>
+      </div>
       <div class="grid2">
         <label class="field"><span class="lbl">Preço de venda</span><div class="money"><span>R$</span><input type="text" id="productPrice" required inputmode="decimal" placeholder="0,00" autocomplete="off"></div></label>
         <label class="field"><span class="lbl">Custo</span><div class="money"><span>R$</span><input type="text" id="productCost" inputmode="decimal" placeholder="0,00" autocomplete="off"></div></label>
       </div>
       <p class="margin-line" id="productMargin"></p>
+      <label class="field"><span class="lbl">Descrição <span class="lbl-opt">(opcional, aparece no site)</span></span>
+        <textarea id="productDesc" rows="3" placeholder="Ex: Tecido dry-fit, modelo torcedor. / TV 50 polegadas, 4K, com controle."></textarea></label>
+      <label class="switch-row">
+        <span><strong>Tem tamanhos ou opções</strong><small>Camisa P, M, G; TV 110V ou 220V. Cada opção tem o seu estoque.</small></span>
+        <input type="checkbox" class="switch" id="productHasOpts">
+      </label>
+      <div class="opts" id="productOpts" hidden>
+        <div class="opt-presets" id="optPresets">
+          <span class="lbl">Prontos</span>
+          <div class="chips">
+            <button type="button" class="chip" data-preset="P,M,G,GG">P M G GG</button>
+            <button type="button" class="chip" data-preset="PP,P,M,G,GG,XG">PP ao XG</button>
+            <button type="button" class="chip" data-preset="110V,220V">110V / 220V</button>
+            <button type="button" class="chip" data-preset="36,38,40,42,44">36 ao 44</button>
+          </div>
+        </div>
+        <ul class="opt-list" id="optList"></ul>
+        <button type="button" class="btn btn-ghost" id="optAddBtn"><svg class="i sm"><use href="#i-plus"/></svg>Adicionar opção</button>
+        <p class="muted small" id="optNote" hidden></p>
+      </div>
       <label class="field field-narrow" id="productInitialStockWrap"><span class="lbl">Quantidade em estoque</span><input type="number" id="productInitialStock" min="0" step="1" inputmode="numeric" placeholder="0"></label>
       <div class="stock-box" id="productStockBox" hidden>
         <div class="row-between">
@@ -478,13 +508,14 @@
             <button type="button" class="btn btn-ghost" id="productAdjustBtn"><svg class="i sm"><use href="#i-edit"/></svg>Corrigir</button>
           </div>
         </div>
+        <ul class="var-stock" id="productVarStock" hidden></ul>
         <ul class="moves" id="productMoves"></ul>
       </div>
       <label class="switch-row">
-        <span><strong>Trabalho com este perfume</strong><small>Desligado: não aparece no site nem em Vender, mas continua aqui.</small></span>
+        <span><strong>Trabalho com este produto</strong><small>Desligado: não aparece no site nem em Vender, mas continua aqui.</small></span>
         <input type="checkbox" class="switch" id="productActive" checked>
       </label>
-      <button type="button" class="btn-danger-text" id="productDeleteBtn" hidden><svg class="i sm"><use href="#i-trash"/></svg>Excluir este perfume</button>
+      <button type="button" class="btn-danger-text" id="productDeleteBtn" hidden><svg class="i sm"><use href="#i-trash"/></svg>Excluir este produto</button>
     </div>
     <div class="sheet-foot"><p class="msg" id="productSaveMsg" role="status"></p>
       <button type="submit" class="btn btn-cta btn-block" id="productSaveBtn">Salvar</button></div>
@@ -500,7 +531,7 @@
     <div class="sheet-body">
       <div class="entry-add" id="entryAddWrap">
         <label class="search"><svg class="i sm"><use href="#i-search"/></svg>
-          <input type="search" id="entrySearch" placeholder="Buscar perfume para adicionar" autocomplete="off"></label>
+          <input type="search" id="entrySearch" placeholder="Buscar produto para adicionar" autocomplete="off"></label>
         <ul class="pick-list" id="entryResults"></ul>
       </div>
       <p class="muted small" id="entryHint">Quantas unidades chegaram de cada um e quanto você pagou na unidade.</p>
@@ -523,6 +554,7 @@
       <button type="button" class="icon-btn" data-close aria-label="Fechar"><svg class="i sm"><use href="#i-x"/></svg></button></div>
     <div class="sheet-body">
       <p class="muted" id="adjustName"></p>
+      <label class="field" id="adjustVariantWrap" hidden><span class="lbl">Opção</span><select id="adjustVariant"></select></label>
       <div class="stepper stepper-lg">
         <button type="button" data-step="-1" aria-label="Menos"><svg class="i"><use href="#i-minus"/></svg></button>
         <input type="number" id="adjustQty" min="0" step="1" inputmode="numeric" aria-label="Quantidade real">
@@ -533,6 +565,19 @@
     </div>
     <div class="sheet-foot"><p class="msg" id="adjustMsg"></p><button type="submit" class="btn btn-cta btn-block" id="adjustSaveBtn">Salvar</button></div>
   </form>
+</div>
+
+<!-- Escolher a opção na venda -->
+<div class="overlay" id="variantOverlay" hidden>
+  <div class="sheet sheet-sm" role="dialog" aria-modal="true" aria-labelledby="variantTitle">
+    <div class="sheet-head"><span class="grab"></span>
+      <h2 class="h-display" id="variantTitle">Qual opção?</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Fechar"><svg class="i sm"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-body">
+      <div class="vpick-head"><img id="variantImg" alt=""><div><strong id="variantProd"></strong><span class="muted small" id="variantPrice"></span></div></div>
+      <div class="vgrid" id="variantGrid"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Venda registrada -->
@@ -671,14 +716,14 @@
   </form>
 </div>
 
-<!-- Catálogo: escolher os perfumes que trabalho -->
+<!-- Catálogo: escolher os produtos que trabalho -->
 <div class="overlay" id="catalogOverlay" hidden>
   <div class="sheet sheet-full" role="dialog" aria-modal="true" aria-labelledby="catalogTitle">
     <div class="sheet-head"><span class="grab"></span>
-      <h2 class="h-display" id="catalogTitle">Perfumes que eu trabalho</h2>
+      <h2 class="h-display" id="catalogTitle">Produtos que eu trabalho</h2>
       <button type="button" class="icon-btn" id="catalogCloseBtn" aria-label="Fechar"><svg class="i sm"><use href="#i-x"/></svg></button></div>
     <div class="sheet-body">
-      <p class="muted small">Marque os perfumes que você vende. Só eles aparecem em Perfumes, em Vender e no site. Nada muda até você tocar em Salvar.</p>
+      <p class="muted small">Marque os produtos que você vende. Só eles aparecem em Produtos, em Vender e no site. Nada muda até você tocar em Salvar.</p>
       <label class="search"><svg class="i sm"><use href="#i-search"/></svg>
         <input type="search" id="catalogSearch" placeholder="Buscar no catálogo" autocomplete="off"></label>
       <div class="chips" id="catalogCats"></div>
@@ -718,7 +763,7 @@
       <button type="button" class="icon-btn" data-close aria-label="Fechar"><svg class="i sm"><use href="#i-x"/></svg></button></div>
     <div class="sheet-body">
       <input type="hidden" id="categoryOriginalId">
-      <label class="field"><span class="lbl">Nome</span><input type="text" id="categoryLabel" required placeholder="Ex: Perfumes Masculinos"></label>
+      <label class="field"><span class="lbl">Nome</span><input type="text" id="categoryLabel" required placeholder="Ex: Camisas de time"></label>
       <div class="grid2">
         <label class="field"><span class="lbl">Identificador</span><input type="text" id="categoryId" required autocapitalize="off"><small class="hint">Gerado a partir do nome.</small></label>
         <label class="field"><span class="lbl">Ordem</span><input type="number" id="categorySort" value="0" inputmode="numeric"></label>

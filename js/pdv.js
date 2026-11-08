@@ -60,9 +60,9 @@ function renderAttention() {
   low.slice(0, 3).forEach(p => items.push({ kind: "warn", icon: "i-bottle", title: `Acabando · ${p.name}`, sub: `Resta${stockOf(p) === 1 ? "" : "m"} ${stockOf(p)}`, act: `prod:${p.id}`, ord: 2 }));
   if (low.length > 3) items.push({ kind: "warn", icon: "i-bottle", title: `Mais ${low.length - 3} acabando`, sub: "Ver a lista", act: "filter:low", ord: 2 });
   const noPrice = active.filter(p => !hasPrice(p)).length;
-  if (noPrice) items.push({ kind: "bad", icon: "i-tag", title: `${plural(noPrice, "perfume", "perfumes")} de Trabalho sem preço`, sub: "Não aparece no site nem dá para vender", act: "filter:noprice", ord: 3 });
+  if (noPrice) items.push({ kind: "bad", icon: "i-tag", title: `${plural(noPrice, "produto", "produtos")} de Trabalho sem preço`, sub: "Não aparece no site nem dá para vender", act: "filter:noprice", ord: 3 });
   const noStock = active.filter(p => stockOf(p) <= 0).length;
-  if (noStock) items.push({ kind: "warn", icon: "i-box-in", title: `${plural(noStock, "perfume", "perfumes")} de Trabalho sem estoque`, sub: "Chegou mercadoria? Dê entrada", act: "filter:nostock", ord: 4 });
+  if (noStock) items.push({ kind: "warn", icon: "i-box-in", title: `${plural(noStock, "produto", "produtos")} de Trabalho sem estoque`, sub: "Chegou mercadoria? Dê entrada", act: "filter:nostock", ord: 4 });
   items.sort((a, b) => a.ord - b.ord);
   $("attnList").innerHTML = (items.length ? items : [{ kind: "ok", icon: "i-check", title: "Tudo em dia", sub: "Nada precisa da sua atenção agora", act: "" }]).slice(0, 7).map(it => `
     <li><button type="button" class="attn-item" data-act="${it.act}">
@@ -91,10 +91,18 @@ HOOKS.data.push(() => { if (currentView === "inicio") renderAttention(); });
 // =========================================================
 // ENTRADA DE MERCADORIA
 // =========================================================
-const entryState = new Map(); // id -> { qty, cost }
+// produto sem opção: 1 linha; com opção (tamanho, voltagem...): uma quantidade por opção
+const entryState = new Map(); // product_id -> { cost, qty: { [variant_id | ""]: "n" } }
+function entryAdd(id) {
+  const vs = variantsOf(id);
+  const qty = {};
+  if (vs.length) vs.forEach(v => { qty[v.id] = vs.length === 1 ? "1" : "0"; });
+  else qty[""] = "1";
+  entryState.set(id, { cost: COSTS[id] != null ? priceToInput(COSTS[id]) : "", qty });
+}
 function openEntry(ids) {
   entryState.clear();
-  ids.filter(productById).forEach(id => entryState.set(id, { qty: "1", cost: COSTS[id] != null ? priceToInput(COSTS[id]) : "" }));
+  ids.filter(productById).forEach(entryAdd);
   $("entryForm").reset();
   clearMsg($("entryMsg"));
   $("entryAddWrap").hidden = ids.length > 0;
@@ -103,22 +111,31 @@ function openEntry(ids) {
   openSheet($("entryOverlay"));
   if (!ids.length) setTimeout(() => $("entrySearch").focus(), 60);
 }
+const entryStepper = (val, label) => `<div class="stepper"><button type="button" data-step="-1" aria-label="Menos"><svg class="i sm"><use href="#i-minus"/></svg></button>
+  <input type="number" class="qty" value="${escapeHtml(val)}" min="0" step="1" inputmode="numeric" aria-label="${escapeHtml(label)}">
+  <button type="button" data-step="1" aria-label="Mais"><svg class="i sm"><use href="#i-plus"/></svg></button></div>`;
 function renderEntry() {
   const ids = [...entryState.keys()];
-  $("entryTitle").textContent = ids.length > 1 ? `Entrada de ${ids.length} perfumes` : "Chegou mercadoria";
+  $("entryTitle").textContent = ids.length > 1 ? `Entrada de ${ids.length} produtos` : "Chegou mercadoria";
   $("entryHint").hidden = ids.length === 0;
   $("entryList").innerHTML = ids.length ? ids.map(id => {
     const p = productById(id), st = entryState.get(id);
+    const vs = variantsOf(id);
+    const cost = `<div class="money"><span>R$</span><input type="text" class="unit-cost" inputmode="decimal" placeholder="custo/un" value="${escapeHtml(st.cost)}" aria-label="Custo por unidade"></div>`;
+    if (!vs.length) {
+      return `<li class="line" data-id="${id}">
+        <img src="${escapeHtml(p.img)}" alt="" loading="lazy">
+        <div class="line-name">${escapeHtml(p.name)}<small>Tem ${stockOf(p)} agora${isActive(p) ? "" : " · Não trabalho"}</small></div>
+        <div class="line-ctl" data-vid="">${entryStepper(st.qty[""], "Quantidade que chegou")}${cost}</div></li>`;
+    }
     return `<li class="line" data-id="${id}">
       <img src="${escapeHtml(p.img)}" alt="" loading="lazy">
-      <div class="line-name">${escapeHtml(p.name)}<small>Tem ${stockOf(p)} agora${isActive(p) ? "" : " · Não trabalho"}</small></div>
-      <div class="line-ctl">
-        <div class="stepper"><button type="button" data-step="-1" aria-label="Menos"><svg class="i sm"><use href="#i-minus"/></svg></button>
-          <input type="number" class="qty" value="${escapeHtml(st.qty)}" min="0" step="1" inputmode="numeric" aria-label="Quantidade que chegou">
-          <button type="button" data-step="1" aria-label="Mais"><svg class="i sm"><use href="#i-plus"/></svg></button></div>
-        <div class="money"><span>R$</span><input type="text" class="unit-cost" inputmode="decimal" placeholder="custo/un" value="${escapeHtml(st.cost)}" aria-label="Custo por unidade"></div>
-      </div></li>`;
-  }).join("") : `<li class="list-empty">Busque acima os perfumes que chegaram.</li>`;
+      <div class="line-name">${escapeHtml(p.name)}<small>Tem ${stockOf(p)} agora${isActive(p) ? "" : " · Não trabalho"} · quanto chegou de cada</small></div>
+      <div class="line-ctl">${cost}</div>
+      <ul class="vlines">${vs.map(v => `<li class="vline" data-vid="${v.id}">
+        <span class="vline-name">${escapeHtml(v.name)}<small>tem ${v.stock}</small></span>
+        ${entryStepper(st.qty[v.id] ?? "0", `Quantidade que chegou de ${v.name}`)}</li>`).join("")}</ul></li>`;
+  }).join("") : `<li class="list-empty">Busque acima os produtos que chegaram.</li>`;
   updateEntryTotal();
 }
 $("entrySearch").addEventListener("input", () => {
@@ -126,13 +143,13 @@ $("entrySearch").addEventListener("input", () => {
   if (!q) { $("entryResults").innerHTML = ""; return; }
   const res = ADMIN_PRODUCTS.filter(p => normalizeText(p.name).includes(q) && !entryState.has(p.id))
     .sort((a, b) => isActive(b) - isActive(a)).slice(0, 8);
-  $("entryResults").innerHTML = res.map(p => `<li><button type="button" data-id="${p.id}"><img src="${escapeHtml(p.img)}" alt=""><span>${escapeHtml(p.name)}<br><small class="muted">tem ${stockOf(p)}${isActive(p) ? "" : " · Não trabalho"}</small></span><svg class="i sm"><use href="#i-plus"/></svg></button></li>`).join("")
-    || `<li class="muted small">Nenhum perfume com esse nome. Cadastre em Perfumes.</li>`;
+  $("entryResults").innerHTML = res.map(p => `<li><button type="button" data-id="${p.id}"><img src="${escapeHtml(p.img)}" alt=""><span>${escapeHtml(p.name)}<br><small class="muted">tem ${stockOf(p)}${hasVariants(p.id) ? ` · ${variantsOf(p.id).length} opções` : ""}${isActive(p) ? "" : " · Não trabalho"}</small></span><svg class="i sm"><use href="#i-plus"/></svg></button></li>`).join("")
+    || `<li class="muted small">Nenhum produto com esse nome. Cadastre em Produtos.</li>`;
 });
 $("entryResults").addEventListener("click", (e) => {
   const b = e.target.closest("[data-id]");
   if (!b) return;
-  entryState.set(b.dataset.id, { qty: "1", cost: COSTS[b.dataset.id] != null ? priceToInput(COSTS[b.dataset.id]) : "" });
+  entryAdd(b.dataset.id);
   $("entrySearch").value = "";
   $("entryResults").innerHTML = "";
   renderEntry();
@@ -150,20 +167,22 @@ $("entryList").addEventListener("input", (e) => {
   const li = e.target.closest(".line");
   if (!li) return;
   const st = entryState.get(li.dataset.id);
-  if (e.target.classList.contains("qty")) st.qty = e.target.value;
+  if (e.target.classList.contains("qty")) st.qty[e.target.closest("[data-vid]").dataset.vid] = e.target.value;
   if (e.target.classList.contains("unit-cost")) st.cost = e.target.value;
   updateEntryTotal();
 });
 function entryLines() {
-  return [...entryState.entries()].map(([product_id, st]) => {
-    const qty = Math.floor(Number(st.qty) || 0);
+  const out = [];
+  entryState.forEach((st, product_id) => {
     const costTxt = String(st.cost || "").trim();
-    return { product_id, qty, unit_cost: costTxt ? parsePrice(costTxt) : null, costTxt };
+    const unit_cost = costTxt ? parsePrice(costTxt) : null;
+    Object.entries(st.qty).forEach(([vid, q]) => out.push({ product_id, variant_id: vid || null, qty: Math.floor(Number(q) || 0), unit_cost, costTxt }));
   });
+  return out;
 }
 function updateEntryTotal() {
   const lines = entryLines();
-  const total = lines.reduce((s, l) => s + (Number.isFinite(l.unit_cost) ? l.unit_cost * l.qty : 0), 0);
+  const total = lines.reduce((s, l) => s + (Number.isFinite(l.unit_cost) ? l.unit_cost * Math.max(0, l.qty) : 0), 0);
   const units = lines.reduce((s, l) => s + Math.max(0, l.qty), 0);
   $("entryTotal").textContent = formatBRL(total);
   $("entrySaveBtn").textContent = units > 0 ? `Lançar ${plural(units, "unidade", "unidades")}` : "Lançar entrada";
@@ -173,41 +192,56 @@ $("entryForm").addEventListener("submit", async (e) => {
   clearMsg($("entryMsg"));
   const lines = entryLines();
   if (lines.some(l => l.costTxt && (!Number.isFinite(l.unit_cost) || l.unit_cost < 0))) return formError($("entryMsg"), "Algum custo está inválido. Escreva só o valor, por exemplo 45,00.");
-  const items = lines.filter(l => l.qty > 0).map(({ product_id, qty, unit_cost }) => ({ product_id, qty, unit_cost }));
+  const items = lines.filter(l => l.qty > 0).map(({ product_id, variant_id, qty, unit_cost }) => ({ product_id, variant_id, qty, unit_cost }));
   if (!items.length) return formError($("entryMsg"), "Coloque a quantidade que chegou.");
   $("entrySaveBtn").disabled = true;
   const { error } = await sb.rpc("pdv_entrada", { p_items: items, p_note: $("entryNote").value.trim() || null });
   $("entrySaveBtn").disabled = false;
   if (error) return formError($("entryMsg"), "Não deu para lançar: " + error.message);
   // quem chegou e estava em "Não trabalho" passa a Trabalho
-  const wake = items.map(i => i.product_id).filter(id => !isActive(productById(id)));
+  const wake = [...new Set(items.map(i => i.product_id))].filter(id => !isActive(productById(id)));
   if (wake.length) await sb.from("products").update({ active: true }).in("id", wake);
   const units = items.reduce((s, i) => s + i.qty, 0);
   closeSheet($("entryOverlay"));
   if (selecting) setSelecting(false);
-  showToast(`Entrada lançada: ${plural(units, "unidade", "unidades")}${wake.length ? ` · ${plural(wake.length, "perfume voltou", "perfumes voltaram")} para Trabalho` : ""}`);
+  showToast(`Entrada lançada: ${plural(units, "unidade", "unidades")}${wake.length ? ` · ${plural(wake.length, "produto voltou", "produtos voltaram")} para Trabalho` : ""}`);
   await reloadProducts();
 });
 
 // ---------- corrigir estoque ----------
 let adjustId = null;
-function openAdjust(id) {
+function adjustCurrent() {
+  const vid = $("adjustVariant").value;
+  return vid ? Number((variantById(vid) || {}).stock || 0) : stockOf(productById(adjustId));
+}
+function syncAdjust() {
+  const p = productById(adjustId);
+  const vid = $("adjustVariant").value;
+  const v = vid ? variantById(vid) : null;
+  $("adjustName").textContent = `${p.name}${v ? ` (${v.name})` : ""} · o painel diz ${adjustCurrent()}`;
+  $("adjustQty").value = adjustCurrent();
+}
+function openAdjust(id, vid = null) {
   const p = productById(id);
   if (!p) return;
   adjustId = id;
   $("adjustForm").reset();
   clearMsg($("adjustMsg"));
-  $("adjustName").textContent = `${p.name} · o painel diz ${stockOf(p)}`;
-  $("adjustQty").value = stockOf(p);
+  const vs = variantsOf(id);
+  $("adjustVariantWrap").hidden = !vs.length;
+  $("adjustVariant").innerHTML = vs.map(v => `<option value="${v.id}">${escapeHtml(v.name)} · tem ${v.stock}</option>`).join("");
+  if (vs.length) $("adjustVariant").value = vid && vs.some(v => v.id === vid) ? vid : vs[0].id;
+  syncAdjust();
   openSheet($("adjustOverlay"));
 }
+$("adjustVariant").addEventListener("change", syncAdjust);
 $("adjustForm").addEventListener("click", (e) => { const b = e.target.closest("[data-step]"); if (b) stepInput($("adjustQty"), Number(b.dataset.step)); });
 $("adjustForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const n = Math.floor(Number($("adjustQty").value));
   if (!Number.isFinite(n) || n < 0) return formError($("adjustMsg"), "Quantidade inválida.", $("adjustQty"));
   $("adjustSaveBtn").disabled = true;
-  const { error } = await sb.rpc("pdv_ajustar", { p_product: adjustId, p_stock: n, p_note: $("adjustNote").value.trim() || null });
+  const { error } = await sb.rpc("pdv_ajustar", { p_product: adjustId, p_stock: n, p_note: $("adjustNote").value.trim() || null, p_variant: $("adjustVariant").value || null });
   $("adjustSaveBtn").disabled = false;
   if (error) return formError($("adjustMsg"), "Não deu para salvar: " + error.message);
   closeSheet($("adjustOverlay"));
@@ -218,8 +252,16 @@ $("adjustForm").addEventListener("submit", async (e) => {
 // =========================================================
 // VENDER
 // =========================================================
-const CART = new Map();
+const CART = new Map(); // "product_id|variant_id" -> qtd
 let sellCat = "";
+const ckey = (pid, vid) => `${pid}|${vid || ""}`;
+const csplit = (k) => { const [pid, vid] = k.split("|"); return { pid, vid: vid || null }; };
+function lineStock(pid, vid) {
+  if (vid) { const v = variantById(vid); return v ? Number(v.stock) : 0; }
+  const p = productById(pid);
+  return p ? stockOf(p) : 0;
+}
+function cartQtyOf(pid) { let n = 0; CART.forEach((q, k) => { if (csplit(k).pid === pid) n += q; }); return n; }
 const sale = { pay: null, inst: 1, clientPays: null, prazoN: 1, prazoFirst: null, customer: null };
 
 function sellable(p) { return isActive(p); }
@@ -242,7 +284,7 @@ function renderSellGrid() {
   const list = ADMIN_PRODUCTS.filter(p => sellable(p) && (!sellCat || p.category === sellCat) && (!q || normalizeText(p.name).includes(q)))
     .sort((a, b) => (stockOf(b) > 0) - (stockOf(a) > 0));
   $("sellGrid").innerHTML = list.length ? list.map(p => {
-    const inCart = CART.get(p.id) || 0;
+    const inCart = cartQtyOf(p.id);
     const s = stockOf(p);
     return `<button type="button" class="pcard${inCart ? " is-picked" : ""}${s <= 0 || !hasPrice(p) ? " is-out" : ""}" data-id="${p.id}">
       <span class="pcard-img"><img src="${escapeHtml(p.img)}" alt="" loading="lazy" decoding="async"></span>
@@ -251,7 +293,7 @@ function renderSellGrid() {
       <span class="pcard-body"><span class="pcard-name">${escapeHtml(p.name)}</span>
         <span class="pcard-price">${hasPrice(p) ? formatBRL(p.price) : "sem preço"}</span></span>
     </button>`;
-  }).join("") : `<p class="list-empty" style="grid-column:1/-1">${q ? "<strong>Nada encontrado</strong>Aqui aparecem só os perfumes de Trabalho." : `<strong>Nenhum perfume em "Trabalho"</strong>Marque em Perfumes os que você vende.`}</p>`;
+  }).join("") : `<p class="list-empty" style="grid-column:1/-1">${q ? "<strong>Nada encontrado</strong>Aqui aparecem só os produtos de Trabalho." : `<strong>Nenhum produto em "Trabalho"</strong>Marque em Produtos os que você vende.`}</p>`;
   updateCartBar();
 }
 $("sellSearch").addEventListener("input", renderSellGrid);
@@ -259,24 +301,55 @@ $("sellGrid").addEventListener("click", (e) => {
   const b = e.target.closest(".pcard");
   if (!b) return;
   const p = productById(b.dataset.id);
-  if (!hasPrice(p)) return showToast("Esse perfume está sem preço. Coloque o preço em Perfumes.");
+  if (!hasPrice(p)) return showToast("Esse produto está sem preço. Coloque o preço em Produtos.");
   if (stockOf(p) <= 0) return showToast("Sem estoque. Toque em \"Chegou mercadoria\" para dar entrada.");
-  const have = CART.get(p.id) || 0;
-  if (have >= stockOf(p)) return showToast(`Só tem ${stockOf(p)} em estoque.`);
-  CART.set(p.id, have + 1);
+  if (hasVariants(p.id)) return openVariantPick(p.id);
+  addToSale(p.id, null);
+});
+function addToSale(pid, vid) {
+  const k = ckey(pid, vid);
+  const have = CART.get(k) || 0;
+  const max = lineStock(pid, vid);
+  if (have >= max) { showToast(`Só tem ${max} em estoque.`); return false; }
+  CART.set(k, have + 1);
   if (navigator.vibrate) navigator.vibrate(8);
   renderSellGrid();
   renderSale();
+  return true;
+}
+// produto com tamanho/opção: escolhe qual
+let variantPid = null;
+function renderVariantPick() {
+  const p = productById(variantPid);
+  if (!p) return;
+  $("variantImg").src = p.img || "";
+  $("variantProd").textContent = p.name;
+  $("variantPrice").textContent = `${formatBRL(p.price)} · toque na opção`;
+  $("variantGrid").innerHTML = variantsOf(p.id).map(v => {
+    const inCart = CART.get(ckey(p.id, v.id)) || 0;
+    return `<button type="button" class="vopt${inCart ? " has" : ""}" data-vid="${v.id}" ${v.stock <= 0 ? "disabled" : ""}>
+      <strong>${escapeHtml(v.name)}</strong><small>${v.stock <= 0 ? "sem estoque" : inCart ? `${inCart} na venda · tem ${v.stock}` : `tem ${v.stock}`}</small></button>`;
+  }).join("");
+}
+function openVariantPick(pid) {
+  variantPid = pid;
+  renderVariantPick();
+  openSheet($("variantOverlay"));
+}
+$("variantGrid").addEventListener("click", (e) => {
+  const b = e.target.closest(".vopt");
+  if (!b || b.disabled) return;
+  if (addToSale(variantPid, b.dataset.vid)) closeSheet($("variantOverlay"));
 });
 
 function cartUnits() { let n = 0; CART.forEach(q => n += q); return n; }
-function cartSubtotal() { let s = 0; CART.forEach((q, id) => { const p = productById(id); if (p) s += Number(p.price) * q; }); return round2(s); }
+function cartSubtotal() { let s = 0; CART.forEach((q, k) => { const p = productById(csplit(k).pid); if (p) s += Number(p.price) * q; }); return round2(s); }
 function updateCartBar() {
   const units = cartUnits();
   const show = currentView === "vender" && units > 0 && !document.body.classList.contains("sale-open");
   $("cartBar").hidden = !show;
   document.body.classList.toggle("has-cart", currentView === "vender" && units > 0);
-  $("cartBarCount").textContent = plural(units, "perfume", "perfumes");
+  $("cartBarCount").textContent = plural(units, "produto", "produtos");
   $("cartBarTotal").textContent = formatBRL(saleCalc().total);
   $("sellCount").hidden = units === 0;
   $("sellCount").textContent = units;
@@ -322,21 +395,24 @@ function prazoParcels(total) {
 
 function renderSale() {
   // itens
-  $("cartList").innerHTML = CART.size ? [...CART.entries()].map(([id, qty]) => {
-    const p = productById(id);
+  $("cartList").innerHTML = CART.size ? [...CART.entries()].map(([k, qty]) => {
+    const { pid, vid } = csplit(k);
+    const p = productById(pid);
     if (!p) return "";
-    return `<li class="line" data-id="${id}">
+    const v = vid ? variantById(vid) : null;
+    const max = lineStock(pid, vid);
+    return `<li class="line" data-key="${k}">
       <img src="${escapeHtml(p.img)}" alt="" loading="lazy">
-      <div class="line-name">${escapeHtml(p.name)}<small>${formatBRL(p.price)} cada · tem ${stockOf(p)}</small></div>
+      <div class="line-name">${escapeHtml(p.name)}${v ? ` <span class="pill pill-mute">${escapeHtml(v.name)}</span>` : ""}<small>${formatBRL(p.price)} cada · tem ${max}</small></div>
       <div class="line-ctl">
         <div class="stepper">
           <button type="button" data-cart-step="-1" aria-label="${qty === 1 ? "Tirar da venda" : "Menos"}"><svg class="i sm"><use href="#${qty === 1 ? "i-trash" : "i-minus"}"/></svg></button>
           <input type="number" value="${qty}" readonly tabindex="-1" aria-label="Quantidade">
-          <button type="button" data-cart-step="1" aria-label="Mais" ${qty >= stockOf(p) ? "disabled" : ""}><svg class="i sm"><use href="#i-plus"/></svg></button>
+          <button type="button" data-cart-step="1" aria-label="Mais" ${qty >= max ? "disabled" : ""}><svg class="i sm"><use href="#i-plus"/></svg></button>
         </div>
         <span class="line-sub">${formatBRL(Number(p.price) * qty)}</span>
       </div></li>`;
-  }).join("") : `<li class="list-empty">Toque num perfume para adicionar à venda.</li>`;
+  }).join("") : `<li class="list-empty">Toque num produto para adicionar à venda.</li>`;
   $("cartClearBtn").hidden = CART.size === 0;
   refreshCheckout();
 }
@@ -392,7 +468,7 @@ function refreshCheckout() {
   const parts = [];
   if (c.disc > 0) parts.push(`${formatBRL(c.disc)} de desconto`);
   if (c.surcharge > 0) parts.push(`${formatBRL(c.surcharge)} de taxa`);
-  $("checkoutSubLine").textContent = parts.length ? parts.join(" · ") : `Total · ${plural(cartUnits(), "perfume", "perfumes")}`;
+  $("checkoutSubLine").textContent = parts.length ? parts.join(" · ") : `Total · ${plural(cartUnits(), "produto", "produtos")}`;
   $("checkoutTotal").textContent = formatBRL(c.total);
   $("checkoutSaveBtn").disabled = CART.size === 0;
   updateCartBar();
@@ -401,15 +477,16 @@ function refreshCheckout() {
 $("cartList").addEventListener("click", (e) => {
   const b = e.target.closest("[data-cart-step]");
   if (!b) return;
-  const id = b.closest(".line").dataset.id;
-  const next = (CART.get(id) || 0) + Number(b.dataset.cartStep);
-  if (next <= 0) CART.delete(id); else CART.set(id, Math.min(next, stockOf(productById(id))));
+  const k = b.closest(".line").dataset.key;
+  const { pid, vid } = csplit(k);
+  const next = (CART.get(k) || 0) + Number(b.dataset.cartStep);
+  if (next <= 0) CART.delete(k); else CART.set(k, Math.min(next, lineStock(pid, vid)));
   renderSale();
   renderSellGrid();
   if (CART.size === 0) closeSalePanel();
 });
 $("cartClearBtn").addEventListener("click", async () => {
-  if (!await askConfirm({ title: "Limpar a venda?", text: "Os perfumes marcados saem da venda. Nada é registrado.", yes: "Limpar" })) return;
+  if (!await askConfirm({ title: "Limpar a venda?", text: "Os itens marcados saem da venda. Nada é registrado.", yes: "Limpar" })) return;
   resetSale();
   closeSalePanel();
 });
@@ -455,7 +532,7 @@ $("checkoutSaveBtn").addEventListener("click", async () => {
   if (dTxt && !Number.isFinite(parsePrice(dTxt))) return formError(msg, "Desconto inválido.", $("checkoutDiscount"));
   if (sale.pay === "prazo" && (!sale.customer || !sale.customer.cpf)) return formError(msg, "A prazo precisa do cliente com CPF. Toque em \"Já tem cadastro\" ou \"Cliente novo\".");
   const c = saleCalc();
-  const items = [...CART.entries()].map(([product_id, qty]) => ({ product_id, qty, unit_price: Number(productById(product_id).price) }));
+  const items = [...CART.entries()].map(([k, qty]) => { const { pid, vid } = csplit(k); return { product_id: pid, variant_id: vid, qty, unit_price: Number(productById(pid).price) }; });
   const btn = $("checkoutSaveBtn");
   btn.disabled = true; btn.textContent = "Registrando…";
   const { data: saleId, error } = await sb.rpc("pdv_vender", {
@@ -490,7 +567,7 @@ async function fetchSale(id) {
 }
 function receiptText(s) {
   const when = new Date(s.created_at).toLocaleDateString("pt-BR");
-  const lines = (s.sale_items || []).map(i => `${i.qty}x ${i.name} — ${formatBRL(i.qty * i.unit_price)}`);
+  const lines = (s.sale_items || []).map(i => `${i.qty}x ${i.name}${i.variant_name ? ` (${i.variant_name})` : ""} — ${formatBRL(i.qty * i.unit_price)}`);
   const out = [`*${storeName()}*`, `Comprovante da compra nº ${s.number} · ${when}`, "", ...lines, ""];
   if (Number(s.discount) > 0) out.push(`Desconto: −${formatBRL(s.discount)}`);
   if (Number(s.surcharge) > 0) out.push(`Taxa do cartão: ${formatBRL(s.surcharge)}`);
@@ -529,11 +606,14 @@ HOOKS.view.push((v) => {
   updateCartBar();
 });
 HOOKS.data.push(() => {
-  CART.forEach((q, id) => {
-    const p = productById(id);
-    if (!p || !isActive(p) || stockOf(p) <= 0) CART.delete(id);
-    else if (q > stockOf(p)) CART.set(id, stockOf(p));
+  CART.forEach((q, k) => {
+    const { pid, vid } = csplit(k);
+    const p = productById(pid);
+    const max = lineStock(pid, vid);
+    if (!p || !isActive(p) || max <= 0 || (vid && !variantById(vid)) || (!vid && hasVariants(pid))) CART.delete(k);
+    else if (q > max) CART.set(k, max);
   });
+  if (!$("variantOverlay").hidden) renderVariantPick();
   if (currentView === "vender") { renderSellCats(); renderSellGrid(); renderSale(); }
 });
 
@@ -556,7 +636,7 @@ wireChips($("salesPeriod"), "period", (p) => { salesPeriod = p; loadSales(); });
 async function loadSales() {
   const t = ++salesTicket;
   skeleton($("salesList"), 3);
-  let q = sb.from("sales").select("*, sale_items(name,qty,unit_price)").order("created_at", { ascending: false }).limit(800);
+  let q = sb.from("sales").select("*, sale_items(name,variant_name,qty,unit_price)").order("created_at", { ascending: false }).limit(800);
   const [a, b] = periodRange(salesPeriod);
   if (a) q = q.gte("created_at", a.toISOString());
   if (b) q = q.lt("created_at", b.toISOString());
@@ -584,7 +664,7 @@ function renderSales() {
   $("payBreakdown").innerHTML = payRows.length ? payRows.map(([m, v]) => `<li>${payMini(m)}<span class="bar-name">${(PAY_INFO[m] || PAY_INFO.outro).label}</span><span class="bar-val">${formatBRL(v)}</span><span class="bar-track"><span class="bar-fill" style="width:${(v / pmax) * 100}%"></span></span></li>`).join("") : `<li class="muted small">Sem vendas no período.</li>`;
 
   const byItem = {};
-  ok.forEach(s => (s.sale_items || []).forEach(i => { byItem[i.name] = (byItem[i.name] || 0) + i.qty; }));
+  ok.forEach(s => (s.sale_items || []).forEach(i => { const n = i.variant_name ? `${i.name} (${i.variant_name})` : i.name; byItem[n] = (byItem[n] || 0) + i.qty; }));
   const top = Object.entries(byItem).sort((a, b) => b[1] - a[1]).slice(0, 6);
   $("topItems").innerHTML = top.length ? top.map(([n, q]) => `<li><span class="t-name">${escapeHtml(n)}</span><span class="t-qty">${q} un</span></li>`).join("") : `<li class="muted small" style="counter-increment:none">Sem vendas no período.</li>`;
 
@@ -621,7 +701,7 @@ async function openSaleById(id) {
       <span>${when}</span><span>${payLabel(s)}${s.customer ? ` · ${escapeHtml(s.customer)}` : ""}</span>
     </div>
     <ul class="lines">${(s.sale_items || []).map(i => `<li class="line"><img src="${escapeHtml(i.img || "")}" alt="" loading="lazy">
-      <div class="line-name">${escapeHtml(i.name)}<small>${i.qty} × ${formatBRL(i.unit_price)}</small></div>
+      <div class="line-name">${escapeHtml(i.name)}${i.variant_name ? ` <span class="pill pill-mute">${escapeHtml(i.variant_name)}</span>` : ""}<small>${i.qty} × ${formatBRL(i.unit_price)}</small></div>
       <div class="line-ctl"><span class="line-sub">${formatBRL(i.qty * i.unit_price)}</span></div></li>`).join("")}</ul>
     <div class="totals">
       ${Number(s.discount) > 0 || Number(s.surcharge) > 0 ? `<div><span>Subtotal</span><span>${formatBRL(s.subtotal)}</span></div>` : ""}
@@ -640,7 +720,7 @@ $("saleCancelBtn").addEventListener("click", async () => {
   const s = openSale;
   if (!s) return;
   const units = (s.sale_items || []).reduce((n, i) => n + i.qty, 0);
-  if (!await askConfirm({ title: `Cancelar a venda nº ${s.number}?`, text: `${plural(units, "O perfume volta", "Os perfumes voltam")} para o estoque e a venda sai das contas.${s.payment === "prazo" ? " As parcelas em aberto também são canceladas." : ""}`, yes: "Cancelar venda" })) return;
+  if (!await askConfirm({ title: `Cancelar a venda nº ${s.number}?`, text: `${plural(units, "O item volta", "Os itens voltam")} para o estoque e a venda sai das contas.${s.payment === "prazo" ? " As parcelas em aberto também são canceladas." : ""}`, yes: "Cancelar venda" })) return;
   const { error } = await sb.rpc("pdv_cancelar_venda", { p_sale: s.id });
   if (error) return showToast(error.message);
   closeSheet($("saleOverlay"));
