@@ -140,12 +140,15 @@ function cartSubtotal() {
 
 function renderSellList() {
   const q = normalizeText(sellSearch.value.trim());
+  // só os perfumes que você trabalha
   const list = ADMIN_PRODUCTS
-    .filter(p => !q || normalizeText(p.name).includes(q))
+    .filter(p => isActive(p) && (!q || normalizeText(p.name).includes(q)))
     .sort((a, b) => (stockOf(b) > 0) - (stockOf(a) > 0));
 
   if (list.length === 0) {
-    sellList.innerHTML = `<li class="list-empty"><strong>Nada encontrado</strong>Tente outro nome.</li>`;
+    sellList.innerHTML = q
+      ? `<li class="list-empty"><strong>Nada encontrado</strong>Tente outro nome. Aqui só aparecem os perfumes marcados como Trabalho.</li>`
+      : `<li class="list-empty"><strong>Nenhum perfume em "Trabalho"</strong>Marque em Perfumes os que você trabalha.</li>`;
   } else {
     sellList.innerHTML = list.map(p => {
       const inCart = CART.get(p.id) || 0;
@@ -174,6 +177,7 @@ sellList.addEventListener("click", (e) => {
   const p = productById(row.dataset.id);
   if (!p) return;
   const have = CART.get(p.id) || 0;
+  if (!(Number(p.price) > 0)) { showToast("Esse perfume está sem preço. Coloque o preço em Perfumes."); return; }
   if (stockOf(p) <= 0) { showToast("Sem estoque. Dê entrada antes de vender."); return; }
   if (have >= stockOf(p)) { showToast(`Só tem ${stockOf(p)} em estoque.`); return; }
   CART.set(p.id, have + 1);
@@ -466,7 +470,7 @@ function onPdvDataLoaded() {
   // tira do carrinho o que sumiu ou ficou sem estoque
   CART.forEach((q, id) => {
     const p = productById(id);
-    if (!p || stockOf(p) <= 0) CART.delete(id);
+    if (!p || !isActive(p) || stockOf(p) <= 0) CART.delete(id);
     else if (q > stockOf(p)) CART.set(id, stockOf(p));
   });
   if (currentTab === "vender") renderSellList(); else updateCartBar();

@@ -1063,3 +1063,8 @@ body.has-cart .admin-content { padding-bottom: calc(var(--nav-h) + var(--safe-b)
 /* aviso acima da barra do carrinho */
 body.has-cart .toast { bottom: calc(var(--nav-h) + var(--safe-b) + 84px); }
 @media (min-width: 760px) { body.has-cart .toast { bottom: 96px; } }
+
+/* confirmação digitada */
+.confirm-type { margin: -8px 0 18px; }
+.admin-body .confirm-type input { text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.abtn-danger:disabled { opacity: .45; cursor: not-allowed; }

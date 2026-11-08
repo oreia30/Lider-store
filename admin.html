@@ -34,6 +34,7 @@
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></symbol>
     <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
     <symbol id="i-select" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
     <!-- formas de pagamento (preenchidas) -->
     <symbol id="p-pix" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 2.2c.6 0 1.1.2 1.5.6l3.1 3.1h-.5c-.9 0-1.7.4-2.3 1L12.4 8.3a.6.6 0 0 1-.8 0L10.2 6.9c-.6-.6-1.4-1-2.3-1h-.5l3.1-3.1c.4-.4.9-.6 1.5-.6zM5.6 7.4h2.3c.5 0 .9.2 1.2.5l1.4 1.4c.8.8 2.2.8 3 0l1.4-1.4c.3-.3.7-.5 1.2-.5h2.3l2.4 2.4c.8.8.8 2.2 0 3l-2.4 2.4h-2.3c-.5 0-.9-.2-1.2-.5l-1.4-1.4a2.1 2.1 0 0 0-3 0l-1.4 1.4c-.3.3-.7.5-1.2.5H5.6L3.2 13.3a2.1 2.1 0 0 1 0-3zm1.8 10.7h.5c.9 0 1.7-.4 2.3-1l1.4-1.4c.2-.2.6-.2.8 0l1.4 1.4c.6.6 1.4 1 2.3 1h.5l-3.1 3.1a2.1 2.1 0 0 1-3 0z"/></symbol>
@@ -110,8 +111,9 @@
         <button role="tab" class="chip active" data-status="all">Todos <span class="count" id="countAll">0</span></button>
         <button role="tab" class="chip" data-status="stock">Com estoque <span class="count" id="countStock">0</span></button>
         <button role="tab" class="chip" data-status="nostock">Sem estoque <span class="count" id="countNoStock">0</span></button>
-        <button role="tab" class="chip" data-status="active">No site <span class="count" id="countActive">0</span></button>
-        <button role="tab" class="chip" data-status="hidden">Ocultos <span class="count" id="countHidden">0</span></button>
+        <button role="tab" class="chip" data-status="active">Trabalho <span class="count" id="countActive">0</span></button>
+        <button role="tab" class="chip" data-status="hidden">Não trabalho <span class="count" id="countHidden">0</span></button>
+        <button role="tab" class="chip" data-status="noprice">Sem preço <span class="count" id="countNoPrice">0</span></button>
       </div>
 
       <div class="select-all-row" id="selectAllRow" hidden>
@@ -279,9 +281,9 @@
     </div>
     <div class="bulk-actions">
       <button class="bulk-btn bulk-accent" data-bulk="entry"><svg class="icon"><use href="#i-box-in"/></svg><span>Entrada</span></button>
-      <button class="bulk-btn" data-bulk="show"><svg class="icon"><use href="#i-eye"/></svg><span>Mostrar</span></button>
-      <button class="bulk-btn" data-bulk="hide"><svg class="icon"><use href="#i-eye-off"/></svg><span>Ocultar</span></button>
-      <button class="bulk-btn bulk-danger" data-bulk="delete"><svg class="icon"><use href="#i-trash"/></svg><span>Excluir</span></button>
+      <button class="bulk-btn" data-bulk="show"><svg class="icon"><use href="#i-eye"/></svg><span>Trabalho</span></button>
+      <button class="bulk-btn" data-bulk="hide"><svg class="icon"><use href="#i-eye-off"/></svg><span>Não trabalho</span></button>
+      <button class="bulk-btn" data-bulk="more" aria-label="Mais opções"><svg class="icon"><use href="#i-more"/></svg><span>Mais</span></button>
     </div>
   </div>
 </div>
@@ -345,8 +347,8 @@
 
       <label class="switch-row">
         <span>
-          <strong>Aparece no site</strong>
-          <small>Desligue para esconder sem apagar.</small>
+          <strong>Trabalho com este perfume</strong>
+          <small>Desligado: não aparece no site nem em Vender, mas continua aqui.</small>
         </span>
         <input type="checkbox" class="switch" id="productActive" checked>
       </label>
@@ -557,11 +559,30 @@
   </form>
 </div>
 
+<!-- MAIS OPÇÕES (seleção) -->
+<div class="sheet-overlay" id="bulkMoreOverlay" hidden>
+  <div class="sheet sheet-short" role="dialog" aria-modal="true" aria-labelledby="bulkMoreTitle">
+    <div class="sheet-head">
+      <button type="button" class="btn-icon" data-close aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button>
+      <h2 id="bulkMoreTitle">Mais opções</h2>
+      <span class="sheet-head-spacer"></span>
+    </div>
+    <div class="sheet-body">
+      <p class="hint" style="margin:0">Se você só não trabalha com eles, use "Não trabalho": somem do site e dá pra voltar quando quiser.</p>
+      <button type="button" class="btn-text-danger" id="bulkDeleteBtn"><svg class="icon"><use href="#i-trash"/></svg><span>Excluir de vez</span></button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRMAÇÃO -->
 <div class="sheet-overlay confirm-overlay" id="confirmOverlay" hidden>
   <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText">
     <h2 id="confirmTitle">Tem certeza?</h2>
     <p id="confirmText"></p>
+    <div class="field confirm-type" id="confirmTypeWrap" hidden>
+      <label for="confirmTypeInput" id="confirmTypeLabel">Digite EXCLUIR para confirmar</label>
+      <input type="text" id="confirmTypeInput" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    </div>
     <div class="confirm-actions">
       <button type="button" class="abtn abtn-ghost" id="confirmNo">Voltar</button>
       <button type="button" class="abtn abtn-danger" id="confirmYes">Excluir</button>

@@ -534,7 +534,8 @@ async function loadStoreData() {
 
     // Ajustes > "Mostrar no site só o que tem em estoque"
     const onlyInStock = (settRes.data || []).some(s => s.key === "site_only_in_stock" && s.value === "true");
-    PRODUCTS = (prodRes.data || []).filter(p => !onlyInStock || Number(p.stock) > 0).map(p => ({
+    // sem preço nunca aparece (evita "R$ 0,00" no site)
+    PRODUCTS = (prodRes.data || []).filter(p => Number(p.price) > 0 && (!onlyInStock || Number(p.stock) > 0)).map(p => ({
       id: p.id,
       name: p.name,
       price: Number(p.price),

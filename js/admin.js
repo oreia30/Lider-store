@@ -91,20 +91,29 @@ function stockPill(p) {
 }
 
 // ==== CONFIRMAÇÃO ====
-function askConfirm({ title = "Tem certeza?", text = "", yes = "Excluir", no = "Voltar", danger = true } = {}) {
+function askConfirm({ title = "Tem certeza?", text = "", yes = "Excluir", no = "Voltar", danger = true, typeWord = null } = {}) {
   return new Promise((resolve) => {
     const overlay = $("confirmOverlay");
+    const typeInput = $("confirmTypeInput");
     $("confirmTitle").textContent = title;
     $("confirmText").textContent = text;
     $("confirmYes").textContent = yes;
     $("confirmNo").textContent = no;
     $("confirmNo").hidden = no === null;
     $("confirmYes").className = "abtn " + (danger ? "abtn-danger" : "abtn-primary");
+    $("confirmTypeWrap").hidden = !typeWord;
+    typeInput.value = "";
+    const syncType = () => { $("confirmYes").disabled = !!typeWord && typeInput.value.trim().toUpperCase() !== typeWord; };
+    typeInput.oninput = syncType;
+    if (typeWord) $("confirmTypeLabel").textContent = `Digite ${typeWord} para confirmar`;
+    syncType();
     overlay.hidden = false;
     lockScroll();
-    (no === null ? $("confirmYes") : $("confirmNo")).focus();
+    (typeWord ? typeInput : (no === null ? $("confirmYes") : $("confirmNo"))).focus();
     const done = (val) => {
       overlay.hidden = true;
+      typeInput.oninput = null;
+      $("confirmYes").disabled = false;
       unlockScrollIfIdle();
       $("confirmYes").onclick = $("confirmNo").onclick = overlay.onclick = null;
       document.removeEventListener("keydown", onKey);
@@ -303,7 +312,8 @@ const STATUS_TEST = {
   stock: (p) => stockOf(p) > 0,
   nostock: (p) => stockOf(p) <= 0,
   active: isActive,
-  hidden: (p) => !isActive(p)
+  hidden: (p) => !isActive(p),
+  noprice: (p) => !(Number(p.price) > 0)
 };
 
 function visibleProducts() {
@@ -318,6 +328,7 @@ function renderProductsList() {
   $("countNoStock").textContent = count("nostock");
   $("countActive").textContent = count("active");
   $("countHidden").textContent = count("hidden");
+  $("countNoPrice").textContent = count("noprice");
 
   const units = ADMIN_PRODUCTS.reduce((s, p) => s + Math.max(0, stockOf(p)), 0);
   $("productsSummary").textContent =
@@ -332,8 +343,9 @@ function renderProductsList() {
     else if (filtered) msg = `<strong>Nada encontrado</strong>Tente outro nome ou limpe os filtros.`;
     else if (statusFilter === "stock") msg = `<strong>Nada em estoque ainda</strong>Toque em Selecionar, marque o que chegou e use "Entrada".`;
     else if (statusFilter === "nostock") msg = `<strong>Tudo com estoque</strong>Nenhum perfume zerado.`;
-    else if (statusFilter === "hidden") msg = `<strong>Nenhum perfume oculto</strong>Tudo que está cadastrado aparece no site.`;
-    else if (statusFilter === "active") msg = `<strong>Nada aparecendo no site</strong>Selecione os perfumes e toque em "Mostrar".`;
+    else if (statusFilter === "hidden") msg = `<strong>Nenhum perfume em "Não trabalho"</strong>Você trabalha com todos os cadastrados.`;
+    else if (statusFilter === "active") msg = `<strong>Nenhum perfume em "Trabalho"</strong>Selecione os perfumes que você trabalha e toque em "Trabalho".`;
+    else if (statusFilter === "noprice") msg = `<strong>Todos têm preço</strong>`;
     else msg = `<strong>Nada encontrado</strong>`;
     productList.innerHTML = `<li class="list-empty">${msg}</li>`;
   } else {
@@ -348,14 +360,14 @@ function renderProductsList() {
           <span class="row-text">
             <span class="row-name">${escapeHtml(p.name)}</span>
             <span class="row-meta">
-              <span class="row-price">${formatBRL(p.price)}</span>
+              ${Number(p.price) > 0 ? `<span class="row-price">${formatBRL(p.price)}</span>` : `<span class="stock-pill is-zero">Sem preço</span>`}
               ${stockPill(p)}
-              ${on ? "" : `<span class="row-badge">Oculto</span>`}
+              ${on ? "" : `<span class="row-badge">Não trabalho</span>`}
             </span>
           </span>
         </button>
-        <label class="row-toggle" title="${on ? "Aparece no site" : "Oculto do site"}">
-          <input type="checkbox" class="switch" data-action="toggle" ${on ? "checked" : ""} aria-label="Aparece no site: ${escapeHtml(p.name)}">
+        <label class="row-toggle" title="${on ? "Trabalho" : "Não trabalho"}">
+          <input type="checkbox" class="switch" data-action="toggle" ${on ? "checked" : ""} aria-label="Trabalho com ${escapeHtml(p.name)}">
         </label>
       </li>`;
     }).join("");
@@ -487,7 +499,13 @@ bulkBar.addEventListener("click", async (e) => {
   if (action === "entry") openEntry(ids);
   if (action === "show") await setProductsActive(ids, true);
   if (action === "hide") await setProductsActive(ids, false);
-  if (action === "delete") await deleteProducts(ids);
+  if (action === "more") openSheet($("bulkMoreOverlay"));
+});
+
+$("bulkDeleteBtn").addEventListener("click", async () => {
+  closeSheet($("bulkMoreOverlay"));
+  const ids = [...selectedIds];
+  if (ids.length) await deleteProducts(ids);
 });
 
 async function withBulkBusy(fn) {
@@ -510,11 +528,13 @@ async function setProductsActive(ids, active, { quiet = false } = {}) {
   };
   try {
     await (quiet ? run() : withBulkBusy(run));
+    const noPrice = active ? ids.filter(id => !(Number(productById(id)?.price) > 0)).length : 0;
+    const priceNote = noPrice ? ` ${noPrice === 1 ? "Ele está" : `${noPrice} estão`} sem preço: só aparece${noPrice === 1 ? "" : "m"} no site depois que tiver preço.` : "";
     if (quiet) {
       const p = productById(ids[0]);
-      showToast(active ? `Aparecendo no site: ${p?.name || "perfume"}` : `Oculto do site: ${p?.name || "perfume"}`);
+      showToast((active ? `Trabalho: ${p?.name || "perfume"}.` : `Não trabalho: ${p?.name || "perfume"}. Saiu do site.`) + priceNote);
     } else {
-      showToast(active ? `${plural(ids.length, "perfume aparece", "perfumes aparecem")} no site agora` : `${plural(ids.length, "perfume ocultado", "perfumes ocultados")} do site`);
+      showToast((active ? `${plural(ids.length, "perfume marcado", "perfumes marcados")} como Trabalho.` : `${plural(ids.length, "perfume marcado", "perfumes marcados")} como Não trabalho. Saíram do site.`) + priceNote);
     }
     if (typeof onPdvDataLoaded === "function") onPdvDataLoaded();
   } catch (err) {
@@ -528,10 +548,11 @@ async function setProductsActive(ids, active, { quiet = false } = {}) {
 async function deleteProducts(ids) {
   const names = ids.map(id => productById(id)?.name).filter(Boolean);
   const ok = await askConfirm({
-    title: ids.length === 1 ? "Excluir este perfume?" : `Excluir ${ids.length} perfumes?`,
-    text: (ids.length === 1 ? `"${names[0]}" vai sumir do painel e do site.` : `Eles vão sumir do painel e do site.`) +
-      ` O histórico de vendas continua. Não dá para desfazer; se só quiser esconder, use "Ocultar".`,
-    yes: ids.length === 1 ? "Excluir" : `Excluir ${ids.length}`
+    title: ids.length === 1 ? "Excluir este perfume de vez?" : `Excluir ${ids.length} perfumes de vez?`,
+    text: (ids.length === 1 ? `"${names[0]}" vai sumir do painel e do site, com estoque e histórico.` : `Eles vão sumir do painel e do site, com estoque e histórico.`) +
+      ` Não dá para desfazer. Se você só não trabalha com ${ids.length === 1 ? "ele" : "eles"}, use "Não trabalho".`,
+    yes: ids.length === 1 ? "Excluir" : `Excluir ${ids.length}`,
+    typeWord: ids.length > 1 ? "EXCLUIR" : null
   });
   if (!ok) return false;
 
@@ -809,7 +830,7 @@ function renderCategoriesList() {
       <button type="button" class="row-main" data-action="edit">
         <span class="row-text">
           <span class="row-name">${escapeHtml(c.label)}</span>
-          <span class="row-meta"><span>${plural(total.length, "perfume", "perfumes")}</span><span>${on} no site</span><span>Ordem ${c.sort_order}</span></span>
+          <span class="row-meta"><span>${plural(total.length, "perfume", "perfumes")}</span><span>${on} trabalho</span><span>Ordem ${c.sort_order}</span></span>
         </span>
       </button>
       <div class="row-actions">
@@ -1058,10 +1079,10 @@ function fillSettingsForm() {
 }
 
 function updateOnlyStockHint() {
-  const shown = ADMIN_PRODUCTS.filter(p => isActive(p) && (!settingOnlyStock.checked || stockOf(p) > 0)).length;
+  const shown = ADMIN_PRODUCTS.filter(p => isActive(p) && Number(p.price) > 0 && (!settingOnlyStock.checked || stockOf(p) > 0)).length;
   $("onlyStockHint").textContent = settingOnlyStock.checked
     ? `Ligado: o site mostra ${plural(shown, "perfume", "perfumes")}. O que zerar some sozinho e volta quando você der entrada.`
-    : `Desligado: o site mostra todos os ${plural(shown, "perfume", "perfumes")} marcados como "no site", com ou sem estoque.`;
+    : `Desligado: o site mostra os ${plural(shown, "perfume", "perfumes")} marcados como Trabalho, com ou sem estoque.`;
 }
 
 settingOnlyStock.addEventListener("change", async () => {
