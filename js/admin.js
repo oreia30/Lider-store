@@ -3,11 +3,14 @@ let ADMIN_PRODUCTS = [];
 let ADMIN_CATEGORIES = [];
 let ADMIN_SETTINGS = {};
 let ADMIN_BANNERS = [];
+let COSTS = {};                  // product_id -> custo
 
-let statusFilter = "all";        // all | active | hidden
-let selecting = false;           // modo de seleção ligado
+let statusFilter = "all";        // all | stock | nostock | active | hidden
+let selecting = false;
 const selectedIds = new Set();
 let currentTab = "produtos";
+
+const LOW_STOCK = 2;             // "acabando" quando tem até isso
 
 const $ = (id) => document.getElementById(id);
 
@@ -51,22 +54,24 @@ function normalizeText(str) {
 }
 
 function formatBRL(value) {
-  return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function parsePrice(str) {
-  let s = String(str || "").trim().replace(/[^\d.,]/g, "");
+  let s = String(str ?? "").trim().replace(/[^\d.,]/g, "");
+  if (s === "") return NaN;
   if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
   const n = Number(s);
   return Number.isFinite(n) ? n : NaN;
 }
 
 function priceToInput(n) {
+  if (n == null || n === "") return "";
   return Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function plural(n, one, many) {
-  return `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
+  return `${Number(n).toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 }
 
 function chunk(arr, size) {
@@ -76,18 +81,31 @@ function chunk(arr, size) {
 }
 
 const isActive = (p) => p.active !== false;
+const stockOf = (p) => Number(p.stock || 0);
+const productById = (id) => ADMIN_PRODUCTS.find(p => p.id === id);
+
+function stockPill(p) {
+  const s = stockOf(p);
+  if (s <= 0) return `<span class="stock-pill is-zero">Sem estoque</span>`;
+  return `<span class="stock-pill${s <= LOW_STOCK ? " is-low" : ""}">${s} em estoque</span>`;
+}
 
 // ==== CONFIRMAÇÃO ====
-function askConfirm({ title = "Tem certeza?", text = "", yes = "Excluir" } = {}) {
+function askConfirm({ title = "Tem certeza?", text = "", yes = "Excluir", no = "Voltar", danger = true } = {}) {
   return new Promise((resolve) => {
     const overlay = $("confirmOverlay");
     $("confirmTitle").textContent = title;
     $("confirmText").textContent = text;
     $("confirmYes").textContent = yes;
+    $("confirmNo").textContent = no;
+    $("confirmNo").hidden = no === null;
+    $("confirmYes").className = "abtn " + (danger ? "abtn-danger" : "abtn-primary");
     overlay.hidden = false;
-    $("confirmNo").focus();
+    lockScroll();
+    (no === null ? $("confirmYes") : $("confirmNo")).focus();
     const done = (val) => {
       overlay.hidden = true;
+      unlockScrollIfIdle();
       $("confirmYes").onclick = $("confirmNo").onclick = overlay.onclick = null;
       document.removeEventListener("keydown", onKey);
       resolve(val);
@@ -100,23 +118,47 @@ function askConfirm({ title = "Tem certeza?", text = "", yes = "Excluir" } = {})
   });
 }
 
-// ==== SHEETS ====
+// ==== SHEETS (a página atrás não se mexe) ====
+let lockedScrollY = 0;
+function lockScroll() {
+  if (document.body.classList.contains("scroll-locked")) return;
+  lockedScrollY = window.scrollY;
+  document.body.classList.add("scroll-locked");
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${lockedScrollY}px`;
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+}
+function unlockScrollIfIdle() {
+  if (document.querySelector(".sheet-overlay:not([hidden])")) return;
+  if (!document.body.classList.contains("scroll-locked")) return;
+  document.body.classList.remove("scroll-locked");
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  window.scrollTo(0, lockedScrollY);
+}
 function openSheet(overlay) {
   overlay.hidden = false;
-  document.body.style.overflow = "hidden";
+  lockScroll();
+  const body = overlay.querySelector(".sheet-body");
+  if (body) body.scrollTop = 0;
 }
 function closeSheet(overlay) {
   overlay.hidden = true;
-  if (!document.querySelector(".sheet-overlay:not([hidden])")) document.body.style.overflow = "";
+  unlockScrollIfIdle();
 }
 document.querySelectorAll(".sheet-overlay:not(.confirm-overlay)").forEach(ov => {
-  ov.addEventListener("click", (e) => { if (e.target === ov) closeSheet(ov); });
+  ov.addEventListener("click", (e) => {
+    if (e.target === ov || e.target.closest("[data-close]")) closeSheet(ov);
+  });
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape") return;
+  if (e.key !== "Escape" || !$("confirmOverlay").hidden) return;
   const open = [...document.querySelectorAll(".sheet-overlay:not(.confirm-overlay):not([hidden])")].pop();
-  if (open && $("confirmOverlay").hidden) closeSheet(open);
-  else if (selecting && $("confirmOverlay").hidden) setSelecting(false);
+  if (open) closeSheet(open);
+  else if (selecting) setSelecting(false);
 });
 
 function setPhotoPreview(img, src) {
@@ -169,28 +211,31 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 // ==== ABAS ====
-document.querySelectorAll(".admin-tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    currentTab = tab.dataset.tab;
-    document.querySelectorAll(".admin-tab").forEach(t => {
-      t.classList.toggle("active", t === tab);
-      t.setAttribute("aria-current", t === tab ? "page" : "false");
-    });
-    document.querySelectorAll(".admin-panel").forEach(p => p.hidden = true);
-    $(`panel-${currentTab}`).hidden = false;
-    $("fabNewProduct").hidden = currentTab !== "produtos";
-    if (currentTab !== "produtos") setSelecting(false);
-    window.scrollTo({ top: 0 });
+function showTab(name) {
+  currentTab = name;
+  document.querySelectorAll(".admin-tab").forEach(t => {
+    const on = t.dataset.tab === name;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-current", on ? "page" : "false");
   });
+  document.querySelectorAll(".admin-panel").forEach(p => p.hidden = p.id !== `panel-${name}`);
+  $("fabNewProduct").hidden = name !== "produtos";
+  if (name !== "produtos") setSelecting(false);
+  if (typeof onPdvTab === "function") onPdvTab(name);
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll(".admin-tab").forEach(tab => {
+  tab.addEventListener("click", () => showTab(tab.dataset.tab));
 });
 
 // ==== CARREGAR DADOS ====
 async function loadAllData() {
-  const [prodRes, catRes, settRes, bannerRes] = await Promise.all([
+  const [prodRes, catRes, settRes, bannerRes, costRes] = await Promise.all([
     sb.from("products").select("*").order("created_at", { ascending: true }),
     sb.from("categories").select("*").order("sort_order", { ascending: true }),
     sb.from("settings").select("*"),
-    sb.from("banners").select("*").order("sort_order", { ascending: true })
+    sb.from("banners").select("*").order("sort_order", { ascending: true }),
+    sb.from("product_costs").select("product_id,cost")
   ]);
   if (prodRes.error) showToast("Não consegui carregar os perfumes. Recarregue a página.");
   ADMIN_PRODUCTS = prodRes.data || [];
@@ -198,8 +243,9 @@ async function loadAllData() {
   ADMIN_SETTINGS = {};
   (settRes.data || []).forEach(s => { ADMIN_SETTINGS[s.key] = s.value; });
   ADMIN_BANNERS = bannerRes.data || [];
+  COSTS = {};
+  (costRes.data || []).forEach(c => { COSTS[c.product_id] = Number(c.cost); });
 
-  // remove da seleção o que não existe mais
   const ids = new Set(ADMIN_PRODUCTS.map(p => p.id));
   [...selectedIds].forEach(id => { if (!ids.has(id)) selectedIds.delete(id); });
 
@@ -207,10 +253,20 @@ async function loadAllData() {
 
   renderCategoryFilterOptions();
   renderProductsList();
-  renderCategoriesList();
   renderBannersList();
   fillSettingsForm();
   loadAdmins();
+  if (typeof onPdvDataLoaded === "function") onPdvDataLoaded();
+}
+
+// recarrega só os perfumes (estoque mudou)
+async function reloadProducts() {
+  const { data, error } = await sb.from("products").select("*").order("created_at", { ascending: true });
+  if (!error && data) ADMIN_PRODUCTS = data;
+  const costRes = await sb.from("product_costs").select("product_id,cost");
+  if (!costRes.error) { COSTS = {}; (costRes.data || []).forEach(c => { COSTS[c.product_id] = Number(c.cost); }); }
+  renderProductsList();
+  if (typeof onPdvDataLoaded === "function") onPdvDataLoaded();
 }
 
 function categoryLabel(id) {
@@ -234,7 +290,6 @@ function renderProductsSkeleton() {
   productList.innerHTML = Array.from({ length: 6 }, () => `<li class="skeleton-row"><i></i><i></i></li>`).join("");
 }
 
-// perfumes que passam pela busca + categoria (antes do filtro de situação)
 function baseFiltered() {
   const q = normalizeText(productSearch.value.trim());
   const cat = productCategoryFilter.value;
@@ -243,32 +298,43 @@ function baseFiltered() {
   );
 }
 
+const STATUS_TEST = {
+  all: () => true,
+  stock: (p) => stockOf(p) > 0,
+  nostock: (p) => stockOf(p) <= 0,
+  active: isActive,
+  hidden: (p) => !isActive(p)
+};
+
 function visibleProducts() {
-  const base = baseFiltered();
-  if (statusFilter === "active") return base.filter(isActive);
-  if (statusFilter === "hidden") return base.filter(p => !isActive(p));
-  return base;
+  return baseFiltered().filter(STATUS_TEST[statusFilter]);
 }
 
 function renderProductsList() {
   const base = baseFiltered();
-  const activeCount = base.filter(isActive).length;
+  const count = (k) => base.filter(STATUS_TEST[k]).length;
   $("countAll").textContent = base.length;
-  $("countActive").textContent = activeCount;
-  $("countHidden").textContent = base.length - activeCount;
+  $("countStock").textContent = count("stock");
+  $("countNoStock").textContent = count("nostock");
+  $("countActive").textContent = count("active");
+  $("countHidden").textContent = count("hidden");
 
-  const totalActive = ADMIN_PRODUCTS.filter(isActive).length;
+  const units = ADMIN_PRODUCTS.reduce((s, p) => s + Math.max(0, stockOf(p)), 0);
   $("productsSummary").textContent =
-    `${plural(ADMIN_PRODUCTS.length, "perfume", "perfumes")} · ${totalActive.toLocaleString("pt-BR")} no site`;
+    `${plural(ADMIN_PRODUCTS.length, "perfume", "perfumes")} · ${plural(units, "unidade", "unidades")} em estoque`;
 
   const list = visibleProducts();
+  const filtered = productSearch.value || productCategoryFilter.value;
 
   if (list.length === 0) {
     let msg;
     if (ADMIN_PRODUCTS.length === 0) msg = `<strong>Nenhum perfume cadastrado</strong>Toque no + para cadastrar o primeiro.`;
-    else if (statusFilter === "hidden" && !productSearch.value && !productCategoryFilter.value) msg = `<strong>Nenhum perfume oculto</strong>Tudo que está cadastrado aparece no site.`;
-    else if (statusFilter === "active" && !productSearch.value && !productCategoryFilter.value) msg = `<strong>Nada aparecendo no site</strong>Selecione os perfumes que você trabalha e toque em "Mostrar no site".`;
-    else msg = `<strong>Nada encontrado</strong>Tente outro nome ou limpe os filtros.`;
+    else if (filtered) msg = `<strong>Nada encontrado</strong>Tente outro nome ou limpe os filtros.`;
+    else if (statusFilter === "stock") msg = `<strong>Nada em estoque ainda</strong>Toque em Selecionar, marque o que chegou e use "Entrada".`;
+    else if (statusFilter === "nostock") msg = `<strong>Tudo com estoque</strong>Nenhum perfume zerado.`;
+    else if (statusFilter === "hidden") msg = `<strong>Nenhum perfume oculto</strong>Tudo que está cadastrado aparece no site.`;
+    else if (statusFilter === "active") msg = `<strong>Nada aparecendo no site</strong>Selecione os perfumes e toque em "Mostrar".`;
+    else msg = `<strong>Nada encontrado</strong>`;
     productList.innerHTML = `<li class="list-empty">${msg}</li>`;
   } else {
     productList.innerHTML = list.map(p => {
@@ -283,7 +349,7 @@ function renderProductsList() {
             <span class="row-name">${escapeHtml(p.name)}</span>
             <span class="row-meta">
               <span class="row-price">${formatBRL(p.price)}</span>
-              <span>${escapeHtml(categoryLabel(p.category))}</span>
+              ${stockPill(p)}
               ${on ? "" : `<span class="row-badge">Oculto</span>`}
             </span>
           </span>
@@ -295,44 +361,46 @@ function renderProductsList() {
     }).join("");
   }
   updateSelectionUI();
-  renderCategoriesList(); // contagem por categoria fica sempre em dia
+  renderCategoriesList();
 }
 
 productSearch.addEventListener("input", renderProductsList);
 productCategoryFilter.addEventListener("change", renderProductsList);
 
-$("statusFilter").addEventListener("click", (e) => {
-  const btn = e.target.closest(".seg");
-  if (!btn) return;
-  statusFilter = btn.dataset.status;
-  document.querySelectorAll("#statusFilter .seg").forEach(s => {
-    s.classList.toggle("active", s === btn);
-    s.setAttribute("aria-selected", s === btn);
+function wireChips(container, attr, onPick) {
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest(".chip");
+    if (!btn) return;
+    container.querySelectorAll(".chip").forEach(c => {
+      c.classList.toggle("active", c === btn);
+      c.setAttribute("aria-selected", c === btn);
+    });
+    btn.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    onPick(btn.dataset[attr]);
   });
-  renderProductsList();
-});
+}
 
-// clique na linha: abre o perfume ou marca/desmarca (no modo seleção)
+wireChips($("statusFilter"), "status", (v) => { statusFilter = v; renderProductsList(); });
+
+// toque na linha: abre o perfume ou marca/desmarca
 let suppressNextClick = false;
 productList.addEventListener("click", (e) => {
   const row = e.target.closest(".product-row");
   if (!row) return;
-  const id = row.dataset.id;
   if (e.target.closest("[data-action='open']")) {
     if (suppressNextClick) { suppressNextClick = false; return; }
-    if (selecting) toggleSelected(id);
-    else openProductModal(id);
+    if (selecting) toggleSelected(row.dataset.id);
+    else openProductModal(row.dataset.id);
   }
 });
 
 productList.addEventListener("change", (e) => {
   const sw = e.target.closest("input[data-action='toggle']");
   if (!sw) return;
-  const id = sw.closest(".product-row").dataset.id;
-  setProductsActive([id], sw.checked, { quiet: true });
+  setProductsActive([sw.closest(".product-row").dataset.id], sw.checked, { quiet: true });
 });
 
-// segurar o dedo num perfume liga o modo seleção
+// segurar o dedo liga o modo seleção
 let pressTimer = null;
 let pressStart = null;
 productList.addEventListener("pointerdown", (e) => {
@@ -363,6 +431,7 @@ const bulkBar = $("bulkBar");
 const selectAllCheckbox = $("selectAllCheckbox");
 
 function setSelecting(on) {
+  if (selecting === on && on) return;
   selecting = on;
   if (!on) selectedIds.clear();
   $("panel-produtos").classList.toggle("selecting", on);
@@ -395,7 +464,7 @@ function updateSelectionUI() {
   const n = selectedIds.size;
   bulkBar.hidden = !selecting;
   document.body.classList.toggle("has-bulk", selecting);
-  $("bulkCount").textContent = n === 0 ? "Toque nos perfumes para marcar" : `${plural(n, "selecionado", "selecionados")}`;
+  $("bulkCount").textContent = n === 0 ? "Toque nos perfumes para marcar" : plural(n, "selecionado", "selecionados");
   bulkBar.querySelectorAll(".bulk-btn").forEach(b => { b.disabled = n === 0; });
 }
 
@@ -415,22 +484,21 @@ bulkBar.addEventListener("click", async (e) => {
   const ids = [...selectedIds];
   if (ids.length === 0) return;
   const action = btn.dataset.bulk;
+  if (action === "entry") openEntry(ids);
   if (action === "show") await setProductsActive(ids, true);
   if (action === "hide") await setProductsActive(ids, false);
   if (action === "delete") await deleteProducts(ids);
 });
 
 async function withBulkBusy(fn) {
-  const btns = bulkBar.querySelectorAll(".bulk-btn");
-  btns.forEach(b => b.disabled = true);
+  bulkBar.querySelectorAll(".bulk-btn").forEach(b => b.disabled = true);
   try { return await fn(); }
   finally { updateSelectionUI(); }
 }
 
 // ==== MOSTRAR / OCULTAR ====
 async function setProductsActive(ids, active, { quiet = false } = {}) {
-  // atualiza na hora na tela, desfaz se der erro
-  const before = new Map(ids.map(id => [id, ADMIN_PRODUCTS.find(p => p.id === id)?.active]));
+  const before = new Map(ids.map(id => [id, productById(id)?.active]));
   ADMIN_PRODUCTS.forEach(p => { if (before.has(p.id)) p.active = active; });
   if (!quiet) setSelecting(false); else renderProductsList();
 
@@ -443,11 +511,12 @@ async function setProductsActive(ids, active, { quiet = false } = {}) {
   try {
     await (quiet ? run() : withBulkBusy(run));
     if (quiet) {
-      const p = ADMIN_PRODUCTS.find(p => p.id === ids[0]);
+      const p = productById(ids[0]);
       showToast(active ? `Aparecendo no site: ${p?.name || "perfume"}` : `Oculto do site: ${p?.name || "perfume"}`);
     } else {
       showToast(active ? `${plural(ids.length, "perfume aparece", "perfumes aparecem")} no site agora` : `${plural(ids.length, "perfume ocultado", "perfumes ocultados")} do site`);
     }
+    if (typeof onPdvDataLoaded === "function") onPdvDataLoaded();
   } catch (err) {
     ADMIN_PRODUCTS.forEach(p => { if (before.has(p.id)) p.active = before.get(p.id); });
     renderProductsList();
@@ -457,12 +526,11 @@ async function setProductsActive(ids, active, { quiet = false } = {}) {
 
 // ==== EXCLUIR ====
 async function deleteProducts(ids) {
-  const names = ids.map(id => ADMIN_PRODUCTS.find(p => p.id === id)?.name).filter(Boolean);
+  const names = ids.map(id => productById(id)?.name).filter(Boolean);
   const ok = await askConfirm({
     title: ids.length === 1 ? "Excluir este perfume?" : `Excluir ${ids.length} perfumes?`,
-    text: ids.length === 1
-      ? `"${names[0]}" vai sumir do painel e do site. Não dá para desfazer. Se só quiser esconder, use "Ocultar".`
-      : `Eles vão sumir do painel e do site. Não dá para desfazer. Se só quiser esconder, use "Ocultar".`,
+    text: (ids.length === 1 ? `"${names[0]}" vai sumir do painel e do site.` : `Eles vão sumir do painel e do site.`) +
+      ` O histórico de vendas continua. Não dá para desfazer; se só quiser esconder, use "Ocultar".`,
     yes: ids.length === 1 ? "Excluir" : `Excluir ${ids.length}`
   });
   if (!ok) return false;
@@ -477,6 +545,7 @@ async function deleteProducts(ids) {
     ids.forEach(id => selectedIds.delete(id));
     ADMIN_PRODUCTS = ADMIN_PRODUCTS.filter(p => !ids.includes(p.id));
     if (selecting) setSelecting(false); else renderProductsList();
+    if (typeof onPdvDataLoaded === "function") onPdvDataLoaded();
     showToast(ids.length === 1 ? "Perfume excluído" : `${ids.length} perfumes excluídos`);
     return true;
   } catch (err) {
@@ -493,8 +562,10 @@ const productModalTitle = $("productModalTitle");
 const productIdInput = $("productId");
 const productNameInput = $("productName");
 const productPriceInput = $("productPrice");
+const productCostInput = $("productCost");
 const productCategorySelect = $("productCategory");
 const productActiveInput = $("productActive");
+const productInitialStock = $("productInitialStock");
 const productImageFile = $("productImageFile");
 const productImagePreview = $("productImagePreview");
 const productSaveMsg = $("productSaveMsg");
@@ -511,6 +582,45 @@ function syncPhotoLabels(img, emptyEl, changeEl) {
   changeEl.hidden = !has;
 }
 
+function updateMarginLine() {
+  const price = parsePrice(productPriceInput.value);
+  const cost = parsePrice(productCostInput.value);
+  const el = $("productMargin");
+  if (!Number.isFinite(price) || !Number.isFinite(cost) || cost <= 0) { el.textContent = ""; return; }
+  const profit = price - cost;
+  const pct = price > 0 ? Math.round((profit / price) * 100) : 0;
+  el.classList.toggle("is-bad", profit < 0);
+  el.innerHTML = `Lucro por unidade: <strong>${formatBRL(profit)}</strong> (${pct}% do preço)`;
+}
+productPriceInput.addEventListener("input", updateMarginLine);
+productCostInput.addEventListener("input", updateMarginLine);
+
+const MOVE_LABEL = { entrada: "Entrada", venda: "Venda", ajuste: "Correção", cancelamento: "Venda cancelada" };
+
+async function loadProductMoves(id) {
+  const ul = $("productMoves");
+  ul.innerHTML = "";
+  const { data, error } = await sb.from("stock_moves")
+    .select("qty,kind,unit_cost,stock_after,note,created_at")
+    .eq("product_id", id).order("created_at", { ascending: false }).limit(8);
+  if (error || !data || productIdInput.value !== id) return;
+  ul.innerHTML = data.map(m => {
+    const when = new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    const extra = [m.unit_cost != null ? `${formatBRL(m.unit_cost)}/un` : "", m.note || ""].filter(Boolean).join(" · ");
+    return `<li><span>${when} · ${MOVE_LABEL[m.kind] || m.kind}${extra ? ` <small>${escapeHtml(extra)}</small>` : ""}</span>
+      <span class="mv-qty ${m.qty > 0 ? "mv-in" : "mv-out"}">${m.qty > 0 ? "+" : ""}${m.qty}</span></li>`;
+  }).join("");
+}
+
+function refreshProductStockBox(id) {
+  const p = productById(id);
+  if (!p || productIdInput.value !== id || productModalOverlay.hidden) return;
+  $("productStockNum").textContent = stockOf(p);
+  if (COSTS[id] != null && !productCostInput.matches(":focus")) productCostInput.value = priceToInput(COSTS[id]);
+  updateMarginLine();
+  loadProductMoves(id);
+}
+
 function openProductModal(id) {
   productForm.reset();
   productSaveMsg.textContent = "";
@@ -518,15 +628,20 @@ function openProductModal(id) {
   productCategorySelect.innerHTML = ADMIN_CATEGORIES.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.label)}</option>`).join("");
 
   if (id) {
-    const p = ADMIN_PRODUCTS.find(p => p.id === id);
+    const p = productById(id);
     productModalTitle.textContent = "Editar perfume";
     productIdInput.value = p.id;
     productNameInput.value = p.name;
     productPriceInput.value = priceToInput(p.price);
+    productCostInput.value = COSTS[p.id] != null ? priceToInput(COSTS[p.id]) : "";
     productCategorySelect.value = p.category;
     productActiveInput.checked = isActive(p);
     setPhotoPreview(productImagePreview, p.img);
     productDeleteBtn.hidden = false;
+    $("productInitialStockWrap").hidden = true;
+    $("productStockBox").hidden = false;
+    $("productStockNum").textContent = stockOf(p);
+    loadProductMoves(p.id);
   } else {
     productModalTitle.textContent = "Novo perfume";
     productIdInput.value = "";
@@ -535,7 +650,11 @@ function openProductModal(id) {
     if (cat) productCategorySelect.value = cat;
     setPhotoPreview(productImagePreview, "");
     productDeleteBtn.hidden = true;
+    $("productInitialStockWrap").hidden = false;
+    $("productStockBox").hidden = true;
+    $("productMoves").innerHTML = "";
   }
+  updateMarginLine();
   syncPhotoLabels(productImagePreview, $("productPhotoEmpty"), $("productPhotoChange"));
   openSheet(productModalOverlay);
 }
@@ -553,27 +672,32 @@ productDeleteBtn.addEventListener("click", async () => {
   if (deleted) closeSheet(productModalOverlay);
 });
 
+$("productEntryBtn").addEventListener("click", () => { if (productIdInput.value) openEntry([productIdInput.value]); });
+$("productAdjustBtn").addEventListener("click", () => { if (productIdInput.value) openAdjust(productIdInput.value); });
+
+function formError(msgEl, text, focusEl) {
+  msgEl.textContent = text;
+  msgEl.classList.add("error");
+  if (focusEl) focusEl.focus();
+}
+
 productForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   productSaveMsg.classList.remove("error");
   productSaveMsg.textContent = "";
 
   const price = parsePrice(productPriceInput.value);
-  if (!Number.isFinite(price) || price < 0) {
-    productSaveMsg.textContent = "Preço inválido. Escreva só o valor, por exemplo 99,90.";
-    productSaveMsg.classList.add("error");
-    productPriceInput.focus();
-    return;
-  }
+  if (!Number.isFinite(price) || price < 0) return formError(productSaveMsg, "Preço inválido. Escreva só o valor, por exemplo 99,90.", productPriceInput);
+  const costRaw = productCostInput.value.trim();
+  const cost = costRaw ? parsePrice(costRaw) : null;
+  if (costRaw && (!Number.isFinite(cost) || cost < 0)) return formError(productSaveMsg, "Custo inválido. Escreva só o valor, por exemplo 45,00.", productCostInput);
+  const initial = productInitialStock.value === "" ? 0 : Math.floor(Number(productInitialStock.value));
+  if (!Number.isFinite(initial) || initial < 0) return formError(productSaveMsg, "Quantidade inválida.", productInitialStock);
 
   const id = productIdInput.value;
-  let imgUrl = id ? ADMIN_PRODUCTS.find(p => p.id === id).img : "";
+  let imgUrl = id ? productById(id).img : "";
   const file = productImageFile.files[0];
-  if (!imgUrl && !file) {
-    productSaveMsg.textContent = "Coloque uma foto do perfume.";
-    productSaveMsg.classList.add("error");
-    return;
-  }
+  if (!imgUrl && !file) return formError(productSaveMsg, "Coloque uma foto do perfume.");
 
   productSaveBtn.disabled = true;
   productSaveBtn.textContent = file ? "Enviando foto…" : "Salvando…";
@@ -589,17 +713,34 @@ productForm.addEventListener("submit", async (e) => {
       active: productActiveInput.checked
     };
 
-    let error;
-    if (id) ({ error } = await sb.from("products").update(payload).eq("id", id));
-    else ({ error } = await sb.from("products").insert(payload));
-    if (error) throw error;
+    let productId = id;
+    if (id) {
+      const { error } = await sb.from("products").update(payload).eq("id", id);
+      if (error) throw error;
+    } else {
+      const { data, error } = await sb.from("products").insert(payload).select("id").single();
+      if (error) throw error;
+      productId = data.id;
+    }
+
+    if (cost != null && cost !== COSTS[productId]) {
+      const { error } = await sb.from("product_costs").upsert({ product_id: productId, cost, updated_at: new Date().toISOString() });
+      if (error) throw error;
+    }
+
+    if (!id && initial > 0) {
+      const { error } = await sb.rpc("pdv_entrada", {
+        p_items: [{ product_id: productId, qty: initial, unit_cost: cost }],
+        p_note: "Estoque inicial"
+      });
+      if (error) throw error;
+    }
 
     closeSheet(productModalOverlay);
     showToast(id ? "Perfume atualizado" : "Perfume cadastrado");
     await loadAllData();
   } catch (err) {
-    productSaveMsg.textContent = "Não deu para salvar: " + err.message;
-    productSaveMsg.classList.add("error");
+    formError(productSaveMsg, "Não deu para salvar: " + err.message);
   } finally {
     productSaveBtn.disabled = false;
     productSaveBtn.textContent = "Salvar";
@@ -647,6 +788,11 @@ async function uploadImage(rawFile, folder, { maxSize } = {}) {
   return data.publicUrl;
 }
 
+// ==== AJUSTES: SUB-ABAS ====
+wireChips($("configTabs"), "sub", (sub) => {
+  document.querySelectorAll(".config-sub").forEach(s => s.hidden = s.id !== `sub-${sub}`);
+});
+
 // ==== CATEGORIAS ====
 const categoriesList = $("categoriesList");
 
@@ -691,7 +837,6 @@ const categorySortInput = $("categorySort");
 const categorySaveMsg = $("categorySaveMsg");
 
 $("newCategoryBtn").addEventListener("click", () => openCategoryModal(null));
-$("categoryCancelBtn").addEventListener("click", () => closeSheet(categoryModalOverlay));
 
 let categoryIdManuallyEdited = false;
 categoryIdInput.addEventListener("input", () => { categoryIdManuallyEdited = true; });
@@ -743,8 +888,7 @@ categoryForm.addEventListener("submit", async (e) => {
     showToast("Categoria salva");
     await loadAllData();
   } catch (err) {
-    categorySaveMsg.textContent = "Não deu para salvar: " + err.message;
-    categorySaveMsg.classList.add("error");
+    formError(categorySaveMsg, "Não deu para salvar: " + err.message);
   }
 });
 
@@ -755,7 +899,7 @@ async function deleteCategory(id) {
     await askConfirm({
       title: "Essa categoria tem perfumes",
       text: `"${c ? c.label : id}" tem ${plural(inUse, "perfume", "perfumes")}. Mude eles de categoria ou exclua antes de remover a categoria.`,
-      yes: "Entendi"
+      yes: "Entendi", no: null, danger: false
     });
     return;
   }
@@ -811,7 +955,6 @@ const bannerSaveMsg = $("bannerSaveMsg");
 const bannerSaveBtn = $("bannerSaveBtn");
 
 $("newBannerBtn").addEventListener("click", () => openBannerModal(null));
-$("bannerCancelBtn").addEventListener("click", () => closeSheet(bannerModalOverlay));
 
 function openBannerModal(id) {
   bannerForm.reset();
@@ -849,11 +992,7 @@ bannerForm.addEventListener("submit", async (e) => {
   const id = bannerIdInput.value;
   let imgUrl = id ? ADMIN_BANNERS.find(b => b.id === id).image_url : "";
   const file = bannerImageFile.files[0];
-  if (!imgUrl && !file) {
-    bannerSaveMsg.textContent = "Escolha uma imagem para o banner.";
-    bannerSaveMsg.classList.add("error");
-    return;
-  }
+  if (!imgUrl && !file) return formError(bannerSaveMsg, "Escolha uma imagem para o banner.");
 
   bannerSaveBtn.disabled = true;
   bannerSaveBtn.textContent = file ? "Enviando imagem…" : "Salvando…";
@@ -875,8 +1014,7 @@ bannerForm.addEventListener("submit", async (e) => {
     showToast(id ? "Banner atualizado" : "Banner criado");
     await loadAllData();
   } catch (err) {
-    bannerSaveMsg.textContent = "Não deu para salvar: " + err.message;
-    bannerSaveMsg.classList.add("error");
+    formError(bannerSaveMsg, "Não deu para salvar: " + err.message);
   } finally {
     bannerSaveBtn.disabled = false;
     bannerSaveBtn.textContent = "Salvar";
@@ -892,7 +1030,7 @@ async function deleteBanner(id) {
   await loadAllData();
 }
 
-// ==== AJUSTES ====
+// ==== LOJA E SITE ====
 const settingsForm = $("settingsForm");
 const settingStoreName = $("settingStoreName");
 const settingWhatsapp = $("settingWhatsapp");
@@ -903,6 +1041,7 @@ const settingsSaveMsg = $("settingsSaveMsg");
 const settingsSaveBtn = $("settingsSaveBtn");
 const settingMsgBuy = $("settingMsgBuy");
 const settingMsgCart = $("settingMsgCart");
+const settingOnlyStock = $("settingOnlyStock");
 
 const DEFAULT_MSG_BUY = "Olá! Tenho interesse em comprar:\n\n1x {produto} - {preco}\n\nTotal: {total}";
 const DEFAULT_MSG_CART = "Olá! Gostaria de fazer o seguinte pedido na {loja}:\n\n{itens}\n\nTotal: {total}";
@@ -914,7 +1053,31 @@ function fillSettingsForm() {
   setPhotoPreview(settingLogoPreview, ADMIN_SETTINGS.logo_url || "assets/logo/logo.png");
   settingMsgBuy.value = ADMIN_SETTINGS.whatsapp_msg_buy || DEFAULT_MSG_BUY;
   settingMsgCart.value = ADMIN_SETTINGS.whatsapp_msg_cart || DEFAULT_MSG_CART;
+  settingOnlyStock.checked = ADMIN_SETTINGS.site_only_in_stock === "true";
+  updateOnlyStockHint();
 }
+
+function updateOnlyStockHint() {
+  const shown = ADMIN_PRODUCTS.filter(p => isActive(p) && (!settingOnlyStock.checked || stockOf(p) > 0)).length;
+  $("onlyStockHint").textContent = settingOnlyStock.checked
+    ? `Ligado: o site mostra ${plural(shown, "perfume", "perfumes")}. O que zerar some sozinho e volta quando você der entrada.`
+    : `Desligado: o site mostra todos os ${plural(shown, "perfume", "perfumes")} marcados como "no site", com ou sem estoque.`;
+}
+
+settingOnlyStock.addEventListener("change", async () => {
+  const on = settingOnlyStock.checked;
+  settingOnlyStock.disabled = true;
+  const { error } = await sb.from("settings").upsert({ key: "site_only_in_stock", value: on ? "true" : "false" });
+  settingOnlyStock.disabled = false;
+  if (error) {
+    settingOnlyStock.checked = !on;
+    showToast("Não deu para salvar: " + error.message);
+    return;
+  }
+  ADMIN_SETTINGS.site_only_in_stock = on ? "true" : "false";
+  updateOnlyStockHint();
+  showToast(on ? "Site mostra só o que tem em estoque" : "Site mostra todos os perfumes marcados");
+});
 
 settingLogoFile.addEventListener("change", () => {
   const file = settingLogoFile.files[0];
@@ -948,15 +1111,14 @@ settingsForm.addEventListener("submit", async (e) => {
     showToast("Ajustes salvos");
     await loadAllData();
   } catch (err) {
-    settingsSaveMsg.textContent = "Não deu para salvar: " + err.message;
-    settingsSaveMsg.classList.add("error");
+    formError(settingsSaveMsg, "Não deu para salvar: " + err.message);
   } finally {
     settingsSaveBtn.disabled = false;
     settingsSaveBtn.textContent = "Salvar ajustes";
   }
 });
 
-// ==== ADMINISTRADORES ====
+// ==== ACESSOS ====
 const adminsList = $("adminsList");
 const adminsListMsg = $("adminsListMsg");
 const adminModalOverlay = $("adminModalOverlay");
@@ -1051,7 +1213,6 @@ $("newAdminBtn").addEventListener("click", () => {
   adminSaveMsg.classList.remove("error");
   openSheet(adminModalOverlay);
 });
-$("adminCancelBtn").addEventListener("click", () => closeSheet(adminModalOverlay));
 
 adminForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1069,8 +1230,7 @@ adminForm.addEventListener("submit", async (e) => {
     showToast("Acesso criado");
     await loadAdmins();
   } catch (err) {
-    adminSaveMsg.textContent = "Não deu para salvar: " + err.message;
-    adminSaveMsg.classList.add("error");
+    formError(adminSaveMsg, "Não deu para salvar: " + err.message);
   } finally {
     adminSaveBtn.disabled = false;
     adminSaveBtn.textContent = "Salvar";
@@ -1078,4 +1238,5 @@ adminForm.addEventListener("submit", async (e) => {
 });
 
 // ==== INIT ====
-checkSession();
+// (pdv.js carrega depois e completa as telas de entrada, vender e vendas)
+window.addEventListener("DOMContentLoaded", checkSession);

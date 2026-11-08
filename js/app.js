@@ -532,7 +532,9 @@ async function loadStoreData() {
       sb.from("banners").select("*").order("sort_order", { ascending: true })
     ]);
 
-    PRODUCTS = (prodRes.data || []).map(p => ({
+    // Ajustes > "Mostrar no site só o que tem em estoque"
+    const onlyInStock = (settRes.data || []).some(s => s.key === "site_only_in_stock" && s.value === "true");
+    PRODUCTS = (prodRes.data || []).filter(p => !onlyInStock || Number(p.stock) > 0).map(p => ({
       id: p.id,
       name: p.name,
       price: Number(p.price),
