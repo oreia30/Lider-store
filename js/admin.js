@@ -4,22 +4,30 @@ let ADMIN_CATEGORIES = [];
 let ADMIN_SETTINGS = {};
 let ADMIN_BANNERS = [];
 
-// ==== ELEMENTOS ====
-const loginWrap = document.getElementById("loginWrap");
-const dashboard = document.getElementById("dashboard");
-const loginForm = document.getElementById("loginForm");
-const loginError = document.getElementById("loginError");
-const userEmailEl = document.getElementById("userEmail");
-const logoutBtn = document.getElementById("logoutBtn");
+let statusFilter = "all";        // all | active | hidden
+let selecting = false;           // modo de seleção ligado
+const selectedIds = new Set();
+let currentTab = "produtos";
 
-// ==== TOAST ====
+const $ = (id) => document.getElementById(id);
+
+// ==== ELEMENTOS ====
+const loginWrap = $("loginWrap");
+const dashboard = $("dashboard");
+const loginForm = $("loginForm");
+const loginError = $("loginError");
+const loginBtn = $("loginBtn");
+const userEmailEl = $("userEmail");
+const logoutBtn = $("logoutBtn");
+
+// ==== UTILITÁRIOS ====
 let toastTimer;
 function showToast(text) {
-  const toast = document.getElementById("toast");
+  const toast = $("toast");
   toast.textContent = text;
   toast.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
 function escapeHtml(str) {
@@ -38,18 +46,89 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeText(str) {
+  return (str || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
 function formatBRL(value) {
   return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function parsePrice(str) {
+  let s = String(str || "").trim().replace(/[^\d.,]/g, "");
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function priceToInput(n) {
+  return Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function plural(n, one, many) {
+  return `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+const isActive = (p) => p.active !== false;
+
+// ==== CONFIRMAÇÃO ====
+function askConfirm({ title = "Tem certeza?", text = "", yes = "Excluir" } = {}) {
+  return new Promise((resolve) => {
+    const overlay = $("confirmOverlay");
+    $("confirmTitle").textContent = title;
+    $("confirmText").textContent = text;
+    $("confirmYes").textContent = yes;
+    overlay.hidden = false;
+    $("confirmNo").focus();
+    const done = (val) => {
+      overlay.hidden = true;
+      $("confirmYes").onclick = $("confirmNo").onclick = overlay.onclick = null;
+      document.removeEventListener("keydown", onKey);
+      resolve(val);
+    };
+    const onKey = (e) => { if (e.key === "Escape") done(false); };
+    document.addEventListener("keydown", onKey);
+    $("confirmYes").onclick = () => done(true);
+    $("confirmNo").onclick = () => done(false);
+    overlay.onclick = (e) => { if (e.target === overlay) done(false); };
+  });
+}
+
+// ==== SHEETS ====
+function openSheet(overlay) {
+  overlay.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function closeSheet(overlay) {
+  overlay.hidden = true;
+  if (!document.querySelector(".sheet-overlay:not([hidden])")) document.body.style.overflow = "";
+}
+document.querySelectorAll(".sheet-overlay:not(.confirm-overlay)").forEach(ov => {
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeSheet(ov); });
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const open = [...document.querySelectorAll(".sheet-overlay:not(.confirm-overlay):not([hidden])")].pop();
+  if (open && $("confirmOverlay").hidden) closeSheet(open);
+  else if (selecting && $("confirmOverlay").hidden) setSelecting(false);
+});
+
+function setPhotoPreview(img, src) {
+  if (src) img.setAttribute("src", src); else img.removeAttribute("src");
+  img.closest(".photo-pick").classList.toggle("has-photo", !!src);
 }
 
 // ==== AUTENTICAÇÃO ====
 async function checkSession() {
   const { data } = await sb.auth.getSession();
-  if (data.session) {
-    showDashboard(data.session.user);
-  } else {
-    showLogin();
-  }
+  if (data.session) showDashboard(data.session.user);
+  else showLogin();
 }
 
 function showLogin() {
@@ -61,19 +140,24 @@ async function showDashboard(user) {
   loginWrap.hidden = true;
   dashboard.hidden = false;
   userEmailEl.textContent = user.email;
+  renderProductsSkeleton();
   await loadAllData();
 }
 
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   loginError.textContent = "";
-  const email = document.getElementById("loginEmail").value.trim();
-  const password = document.getElementById("loginPassword").value;
+  loginBtn.disabled = true;
+  loginBtn.textContent = "Entrando…";
+  const email = $("loginEmail").value.trim();
+  const password = $("loginPassword").value;
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  loginBtn.disabled = false;
+  loginBtn.textContent = "Entrar";
   if (error) {
     loginError.textContent = error.message === "Email not confirmed"
-      ? "Confirme seu e-mail antes de entrar (verifique sua caixa de entrada)."
-      : "E-mail ou senha inválidos.";
+      ? "Confirme seu e-mail antes de entrar (veja sua caixa de entrada)."
+      : "E-mail ou senha não conferem.";
     return;
   }
   showDashboard(data.user);
@@ -87,9 +171,16 @@ logoutBtn.addEventListener("click", async () => {
 // ==== ABAS ====
 document.querySelectorAll(".admin-tab").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".admin-tab").forEach(t => t.classList.toggle("active", t === tab));
+    currentTab = tab.dataset.tab;
+    document.querySelectorAll(".admin-tab").forEach(t => {
+      t.classList.toggle("active", t === tab);
+      t.setAttribute("aria-current", t === tab ? "page" : "false");
+    });
     document.querySelectorAll(".admin-panel").forEach(p => p.hidden = true);
-    document.getElementById(`panel-${tab.dataset.tab}`).hidden = false;
+    $(`panel-${currentTab}`).hidden = false;
+    $("fabNewProduct").hidden = currentTab !== "produtos";
+    if (currentTab !== "produtos") setSelecting(false);
+    window.scrollTo({ top: 0 });
   });
 });
 
@@ -101,16 +192,23 @@ async function loadAllData() {
     sb.from("settings").select("*"),
     sb.from("banners").select("*").order("sort_order", { ascending: true })
   ]);
+  if (prodRes.error) showToast("Não consegui carregar os perfumes. Recarregue a página.");
   ADMIN_PRODUCTS = prodRes.data || [];
   ADMIN_CATEGORIES = catRes.data || [];
   ADMIN_SETTINGS = {};
   (settRes.data || []).forEach(s => { ADMIN_SETTINGS[s.key] = s.value; });
   ADMIN_BANNERS = bannerRes.data || [];
 
+  // remove da seleção o que não existe mais
+  const ids = new Set(ADMIN_PRODUCTS.map(p => p.id));
+  [...selectedIds].forEach(id => { if (!ids.has(id)) selectedIds.delete(id); });
+
+  if (ADMIN_SETTINGS.logo_url) $("headerLogo").src = ADMIN_SETTINGS.logo_url;
+
   renderCategoryFilterOptions();
-  renderProductsTable();
-  renderCategoriesTable();
-  renderBannersTable();
+  renderProductsList();
+  renderCategoriesList();
+  renderBannersList();
   fillSettingsForm();
   loadAdmins();
 }
@@ -120,173 +218,428 @@ function categoryLabel(id) {
   return c ? c.label : id;
 }
 
-// ==== PRODUTOS: TABELA ====
-const productsTableBody = document.getElementById("productsTableBody");
-const productSearch = document.getElementById("productSearch");
-const productCategoryFilter = document.getElementById("productCategoryFilter");
+// ==== PERFUMES: LISTA ====
+const productList = $("productList");
+const productSearch = $("productSearch");
+const productCategoryFilter = $("productCategoryFilter");
 
 function renderCategoryFilterOptions() {
+  const current = productCategoryFilter.value;
   productCategoryFilter.innerHTML = `<option value="">Todas as categorias</option>` +
-    ADMIN_CATEGORIES.map(c => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join("");
+    ADMIN_CATEGORIES.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.label)}</option>`).join("");
+  productCategoryFilter.value = ADMIN_CATEGORIES.some(c => c.id === current) ? current : "";
 }
 
-function renderProductsTable() {
-  const search = productSearch.value.trim().toLowerCase();
-  const catFilter = productCategoryFilter.value;
+function renderProductsSkeleton() {
+  productList.innerHTML = Array.from({ length: 6 }, () => `<li class="skeleton-row"><i></i><i></i></li>`).join("");
+}
 
-  const filtered = ADMIN_PRODUCTS.filter(p => {
-    const matchesSearch = !search || p.name.toLowerCase().includes(search);
-    const matchesCat = !catFilter || p.category === catFilter;
-    return matchesSearch && matchesCat;
-  });
+// perfumes que passam pela busca + categoria (antes do filtro de situação)
+function baseFiltered() {
+  const q = normalizeText(productSearch.value.trim());
+  const cat = productCategoryFilter.value;
+  return ADMIN_PRODUCTS.filter(p =>
+    (!q || normalizeText(p.name).includes(q)) && (!cat || p.category === cat)
+  );
+}
 
-  if (filtered.length === 0) {
-    productsTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#999;padding:24px;">Nenhum produto encontrado.</td></tr>`;
-    return;
+function visibleProducts() {
+  const base = baseFiltered();
+  if (statusFilter === "active") return base.filter(isActive);
+  if (statusFilter === "hidden") return base.filter(p => !isActive(p));
+  return base;
+}
+
+function renderProductsList() {
+  const base = baseFiltered();
+  const activeCount = base.filter(isActive).length;
+  $("countAll").textContent = base.length;
+  $("countActive").textContent = activeCount;
+  $("countHidden").textContent = base.length - activeCount;
+
+  const totalActive = ADMIN_PRODUCTS.filter(isActive).length;
+  $("productsSummary").textContent =
+    `${plural(ADMIN_PRODUCTS.length, "perfume", "perfumes")} · ${totalActive.toLocaleString("pt-BR")} no site`;
+
+  const list = visibleProducts();
+
+  if (list.length === 0) {
+    let msg;
+    if (ADMIN_PRODUCTS.length === 0) msg = `<strong>Nenhum perfume cadastrado</strong>Toque no + para cadastrar o primeiro.`;
+    else if (statusFilter === "hidden" && !productSearch.value && !productCategoryFilter.value) msg = `<strong>Nenhum perfume oculto</strong>Tudo que está cadastrado aparece no site.`;
+    else if (statusFilter === "active" && !productSearch.value && !productCategoryFilter.value) msg = `<strong>Nada aparecendo no site</strong>Selecione os perfumes que você trabalha e toque em "Mostrar no site".`;
+    else msg = `<strong>Nada encontrado</strong>Tente outro nome ou limpe os filtros.`;
+    productList.innerHTML = `<li class="list-empty">${msg}</li>`;
+  } else {
+    productList.innerHTML = list.map(p => {
+      const on = isActive(p);
+      const sel = selectedIds.has(p.id);
+      return `
+      <li class="product-row${on ? "" : " is-hidden"}${sel ? " is-selected" : ""}" data-id="${p.id}">
+        <button type="button" class="row-main" data-action="open" aria-pressed="${selecting ? sel : "false"}">
+          <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
+          <img class="row-thumb" src="${escapeHtml(p.img)}" alt="" loading="lazy" decoding="async">
+          <span class="row-text">
+            <span class="row-name">${escapeHtml(p.name)}</span>
+            <span class="row-meta">
+              <span class="row-price">${formatBRL(p.price)}</span>
+              <span>${escapeHtml(categoryLabel(p.category))}</span>
+              ${on ? "" : `<span class="row-badge">Oculto</span>`}
+            </span>
+          </span>
+        </button>
+        <label class="row-toggle" title="${on ? "Aparece no site" : "Oculto do site"}">
+          <input type="checkbox" class="switch" data-action="toggle" ${on ? "checked" : ""} aria-label="Aparece no site: ${escapeHtml(p.name)}">
+        </label>
+      </li>`;
+    }).join("");
   }
-
-  productsTableBody.innerHTML = filtered.map(p => `
-    <tr data-id="${p.id}">
-      <td><img class="admin-table-thumb" src="${p.img}" alt=""></td>
-      <td>${escapeHtml(p.name)}</td>
-      <td>${escapeHtml(categoryLabel(p.category))}</td>
-      <td>${formatBRL(p.price)}</td>
-      <td>
-        <div class="admin-table-actions">
-          <button class="btn-admin-small" data-action="edit-product" data-id="${p.id}">Editar</button>
-          <button class="btn-admin-danger" data-action="delete-product" data-id="${p.id}">Excluir</button>
-        </div>
-      </td>
-    </tr>
-  `).join("");
+  updateSelectionUI();
+  renderCategoriesList(); // contagem por categoria fica sempre em dia
 }
 
-productSearch.addEventListener("input", renderProductsTable);
-productCategoryFilter.addEventListener("change", renderProductsTable);
+productSearch.addEventListener("input", renderProductsList);
+productCategoryFilter.addEventListener("change", renderProductsList);
 
-productsTableBody.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-action]");
+$("statusFilter").addEventListener("click", (e) => {
+  const btn = e.target.closest(".seg");
   if (!btn) return;
-  const id = btn.dataset.id;
-  if (btn.dataset.action === "edit-product") openProductModal(id);
-  if (btn.dataset.action === "delete-product") deleteProduct(id);
+  statusFilter = btn.dataset.status;
+  document.querySelectorAll("#statusFilter .seg").forEach(s => {
+    s.classList.toggle("active", s === btn);
+    s.setAttribute("aria-selected", s === btn);
+  });
+  renderProductsList();
 });
 
-// ==== PRODUTOS: MODAL ====
-const productModalOverlay = document.getElementById("productModalOverlay");
-const productForm = document.getElementById("productForm");
-const productModalTitle = document.getElementById("productModalTitle");
-const productIdInput = document.getElementById("productId");
-const productNameInput = document.getElementById("productName");
-const productPriceInput = document.getElementById("productPrice");
-const productCategorySelect = document.getElementById("productCategory");
-const productImageFile = document.getElementById("productImageFile");
-const productImagePreview = document.getElementById("productImagePreview");
-const productSaveMsg = document.getElementById("productSaveMsg");
-const productSaveBtn = document.getElementById("productSaveBtn");
+// clique na linha: abre o perfume ou marca/desmarca (no modo seleção)
+let suppressNextClick = false;
+productList.addEventListener("click", (e) => {
+  const row = e.target.closest(".product-row");
+  if (!row) return;
+  const id = row.dataset.id;
+  if (e.target.closest("[data-action='open']")) {
+    if (suppressNextClick) { suppressNextClick = false; return; }
+    if (selecting) toggleSelected(id);
+    else openProductModal(id);
+  }
+});
 
-document.getElementById("newProductBtn").addEventListener("click", () => openProductModal(null));
-document.getElementById("productCancelBtn").addEventListener("click", closeProductModal);
+productList.addEventListener("change", (e) => {
+  const sw = e.target.closest("input[data-action='toggle']");
+  if (!sw) return;
+  const id = sw.closest(".product-row").dataset.id;
+  setProductsActive([id], sw.checked, { quiet: true });
+});
+
+// segurar o dedo num perfume liga o modo seleção
+let pressTimer = null;
+let pressStart = null;
+productList.addEventListener("pointerdown", (e) => {
+  suppressNextClick = false;
+  const main = e.target.closest("[data-action='open']");
+  if (!main || selecting) return;
+  pressStart = { x: e.clientX, y: e.clientY };
+  const id = main.closest(".product-row").dataset.id;
+  pressTimer = setTimeout(() => {
+    pressTimer = null;
+    suppressNextClick = true;
+    setSelecting(true);
+    toggleSelected(id, true);
+    if (navigator.vibrate) navigator.vibrate(15);
+  }, 450);
+});
+const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+productList.addEventListener("pointerup", cancelPress);
+productList.addEventListener("pointercancel", cancelPress);
+productList.addEventListener("pointermove", (e) => {
+  if (pressTimer && pressStart && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > 10) cancelPress();
+});
+productList.addEventListener("contextmenu", (e) => { if (e.target.closest(".row-main")) e.preventDefault(); });
+
+// ==== SELEÇÃO ====
+const selectModeBtn = $("selectModeBtn");
+const bulkBar = $("bulkBar");
+const selectAllCheckbox = $("selectAllCheckbox");
+
+function setSelecting(on) {
+  selecting = on;
+  if (!on) selectedIds.clear();
+  $("panel-produtos").classList.toggle("selecting", on);
+  selectModeBtn.classList.toggle("is-on", on);
+  selectModeBtn.querySelector("span").textContent = on ? "Cancelar" : "Selecionar";
+  renderProductsList();
+}
+
+function toggleSelected(id, force) {
+  const want = force ?? !selectedIds.has(id);
+  if (want) selectedIds.add(id); else selectedIds.delete(id);
+  const row = productList.querySelector(`.product-row[data-id="${CSS.escape(id)}"]`);
+  if (row) {
+    row.classList.toggle("is-selected", want);
+    row.querySelector(".row-main").setAttribute("aria-pressed", want);
+  }
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  const vis = visibleProducts();
+  const visSelected = vis.filter(p => selectedIds.has(p.id)).length;
+  $("selectAllRow").hidden = !selecting || vis.length === 0;
+  selectAllCheckbox.checked = vis.length > 0 && visSelected === vis.length;
+  selectAllCheckbox.indeterminate = visSelected > 0 && visSelected < vis.length;
+  $("selectAllLabel").textContent = selectAllCheckbox.checked
+    ? `Todos os ${vis.length} marcados`
+    : `Marcar todos os ${vis.length} da lista`;
+
+  const n = selectedIds.size;
+  bulkBar.hidden = !selecting;
+  document.body.classList.toggle("has-bulk", selecting);
+  $("bulkCount").textContent = n === 0 ? "Toque nos perfumes para marcar" : `${plural(n, "selecionado", "selecionados")}`;
+  bulkBar.querySelectorAll(".bulk-btn").forEach(b => { b.disabled = n === 0; });
+}
+
+selectModeBtn.addEventListener("click", () => setSelecting(!selecting));
+$("bulkCancelBtn").addEventListener("click", () => setSelecting(false));
+
+selectAllCheckbox.addEventListener("change", () => {
+  const vis = visibleProducts();
+  const allOn = vis.every(p => selectedIds.has(p.id));
+  vis.forEach(p => { if (allOn) selectedIds.delete(p.id); else selectedIds.add(p.id); });
+  renderProductsList();
+});
+
+bulkBar.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".bulk-btn");
+  if (!btn || btn.disabled) return;
+  const ids = [...selectedIds];
+  if (ids.length === 0) return;
+  const action = btn.dataset.bulk;
+  if (action === "show") await setProductsActive(ids, true);
+  if (action === "hide") await setProductsActive(ids, false);
+  if (action === "delete") await deleteProducts(ids);
+});
+
+async function withBulkBusy(fn) {
+  const btns = bulkBar.querySelectorAll(".bulk-btn");
+  btns.forEach(b => b.disabled = true);
+  try { return await fn(); }
+  finally { updateSelectionUI(); }
+}
+
+// ==== MOSTRAR / OCULTAR ====
+async function setProductsActive(ids, active, { quiet = false } = {}) {
+  // atualiza na hora na tela, desfaz se der erro
+  const before = new Map(ids.map(id => [id, ADMIN_PRODUCTS.find(p => p.id === id)?.active]));
+  ADMIN_PRODUCTS.forEach(p => { if (before.has(p.id)) p.active = active; });
+  if (!quiet) setSelecting(false); else renderProductsList();
+
+  const run = async () => {
+    for (const part of chunk(ids, 100)) {
+      const { error } = await sb.from("products").update({ active }).in("id", part);
+      if (error) throw error;
+    }
+  };
+  try {
+    await (quiet ? run() : withBulkBusy(run));
+    if (quiet) {
+      const p = ADMIN_PRODUCTS.find(p => p.id === ids[0]);
+      showToast(active ? `Aparecendo no site: ${p?.name || "perfume"}` : `Oculto do site: ${p?.name || "perfume"}`);
+    } else {
+      showToast(active ? `${plural(ids.length, "perfume aparece", "perfumes aparecem")} no site agora` : `${plural(ids.length, "perfume ocultado", "perfumes ocultados")} do site`);
+    }
+  } catch (err) {
+    ADMIN_PRODUCTS.forEach(p => { if (before.has(p.id)) p.active = before.get(p.id); });
+    renderProductsList();
+    showToast("Não deu para salvar: " + err.message);
+  }
+}
+
+// ==== EXCLUIR ====
+async function deleteProducts(ids) {
+  const names = ids.map(id => ADMIN_PRODUCTS.find(p => p.id === id)?.name).filter(Boolean);
+  const ok = await askConfirm({
+    title: ids.length === 1 ? "Excluir este perfume?" : `Excluir ${ids.length} perfumes?`,
+    text: ids.length === 1
+      ? `"${names[0]}" vai sumir do painel e do site. Não dá para desfazer. Se só quiser esconder, use "Ocultar".`
+      : `Eles vão sumir do painel e do site. Não dá para desfazer. Se só quiser esconder, use "Ocultar".`,
+    yes: ids.length === 1 ? "Excluir" : `Excluir ${ids.length}`
+  });
+  if (!ok) return false;
+
+  try {
+    await withBulkBusy(async () => {
+      for (const part of chunk(ids, 100)) {
+        const { error } = await sb.from("products").delete().in("id", part);
+        if (error) throw error;
+      }
+    });
+    ids.forEach(id => selectedIds.delete(id));
+    ADMIN_PRODUCTS = ADMIN_PRODUCTS.filter(p => !ids.includes(p.id));
+    if (selecting) setSelecting(false); else renderProductsList();
+    showToast(ids.length === 1 ? "Perfume excluído" : `${ids.length} perfumes excluídos`);
+    return true;
+  } catch (err) {
+    showToast("Não deu para excluir: " + err.message);
+    await loadAllData();
+    return false;
+  }
+}
+
+// ==== PERFUME: FORMULÁRIO ====
+const productModalOverlay = $("productModalOverlay");
+const productForm = $("productForm");
+const productModalTitle = $("productModalTitle");
+const productIdInput = $("productId");
+const productNameInput = $("productName");
+const productPriceInput = $("productPrice");
+const productCategorySelect = $("productCategory");
+const productActiveInput = $("productActive");
+const productImageFile = $("productImageFile");
+const productImagePreview = $("productImagePreview");
+const productSaveMsg = $("productSaveMsg");
+const productSaveBtn = $("productSaveBtn");
+const productDeleteBtn = $("productDeleteBtn");
+
+$("newProductBtn").addEventListener("click", () => openProductModal(null));
+$("fabNewProduct").addEventListener("click", () => openProductModal(null));
+$("productCancelBtn").addEventListener("click", () => closeSheet(productModalOverlay));
+
+function syncPhotoLabels(img, emptyEl, changeEl) {
+  const has = img.hasAttribute("src");
+  emptyEl.hidden = has;
+  changeEl.hidden = !has;
+}
 
 function openProductModal(id) {
   productForm.reset();
   productSaveMsg.textContent = "";
-  productCategorySelect.innerHTML = ADMIN_CATEGORIES.map(c => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join("");
+  productSaveMsg.classList.remove("error");
+  productCategorySelect.innerHTML = ADMIN_CATEGORIES.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.label)}</option>`).join("");
 
   if (id) {
     const p = ADMIN_PRODUCTS.find(p => p.id === id);
-    productModalTitle.textContent = "Editar produto";
+    productModalTitle.textContent = "Editar perfume";
     productIdInput.value = p.id;
     productNameInput.value = p.name;
-    productPriceInput.value = p.price;
+    productPriceInput.value = priceToInput(p.price);
     productCategorySelect.value = p.category;
-    productImagePreview.src = p.img;
+    productActiveInput.checked = isActive(p);
+    setPhotoPreview(productImagePreview, p.img);
+    productDeleteBtn.hidden = false;
   } else {
-    productModalTitle.textContent = "Novo produto";
+    productModalTitle.textContent = "Novo perfume";
     productIdInput.value = "";
-    productImagePreview.src = "";
+    productActiveInput.checked = true;
+    const cat = productCategoryFilter.value;
+    if (cat) productCategorySelect.value = cat;
+    setPhotoPreview(productImagePreview, "");
+    productDeleteBtn.hidden = true;
   }
-  productModalOverlay.hidden = false;
-}
-
-function closeProductModal() {
-  productModalOverlay.hidden = true;
+  syncPhotoLabels(productImagePreview, $("productPhotoEmpty"), $("productPhotoChange"));
+  openSheet(productModalOverlay);
 }
 
 productImageFile.addEventListener("change", () => {
   const file = productImageFile.files[0];
-  if (file) productImagePreview.src = URL.createObjectURL(file);
+  if (file) setPhotoPreview(productImagePreview, URL.createObjectURL(file));
+  syncPhotoLabels(productImagePreview, $("productPhotoEmpty"), $("productPhotoChange"));
+});
+
+productDeleteBtn.addEventListener("click", async () => {
+  const id = productIdInput.value;
+  if (!id) return;
+  const deleted = await deleteProducts([id]);
+  if (deleted) closeSheet(productModalOverlay);
 });
 
 productForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  productSaveBtn.disabled = true;
   productSaveMsg.classList.remove("error");
-  productSaveMsg.textContent = "Salvando...";
+  productSaveMsg.textContent = "";
+
+  const price = parsePrice(productPriceInput.value);
+  if (!Number.isFinite(price) || price < 0) {
+    productSaveMsg.textContent = "Preço inválido. Escreva só o valor, por exemplo 99,90.";
+    productSaveMsg.classList.add("error");
+    productPriceInput.focus();
+    return;
+  }
+
+  const id = productIdInput.value;
+  let imgUrl = id ? ADMIN_PRODUCTS.find(p => p.id === id).img : "";
+  const file = productImageFile.files[0];
+  if (!imgUrl && !file) {
+    productSaveMsg.textContent = "Coloque uma foto do perfume.";
+    productSaveMsg.classList.add("error");
+    return;
+  }
+
+  productSaveBtn.disabled = true;
+  productSaveBtn.textContent = file ? "Enviando foto…" : "Salvando…";
 
   try {
-    const id = productIdInput.value;
-    let imgUrl = id ? ADMIN_PRODUCTS.find(p => p.id === id).img : "";
-
-    const file = productImageFile.files[0];
-    if (file) {
-      imgUrl = await uploadImage(file, "produtos");
-    }
+    if (file) imgUrl = await uploadImage(file, "produtos", { maxSize: 1000 });
 
     const payload = {
       name: productNameInput.value.trim(),
-      price: Number(productPriceInput.value),
+      price,
       category: productCategorySelect.value,
-      img: imgUrl
+      img: imgUrl,
+      active: productActiveInput.checked
     };
 
-    if (!payload.img) {
-      productSaveMsg.textContent = "Escolha uma foto para o produto.";
-      productSaveMsg.classList.add("error");
-      productSaveBtn.disabled = false;
-      return;
-    }
-
     let error;
-    if (id) {
-      ({ error } = await sb.from("products").update(payload).eq("id", id));
-    } else {
-      ({ error } = await sb.from("products").insert(payload));
-    }
+    if (id) ({ error } = await sb.from("products").update(payload).eq("id", id));
+    else ({ error } = await sb.from("products").insert(payload));
     if (error) throw error;
 
-    closeProductModal();
-    showToast(id ? "Produto atualizado" : "Produto criado");
+    closeSheet(productModalOverlay);
+    showToast(id ? "Perfume atualizado" : "Perfume cadastrado");
     await loadAllData();
   } catch (err) {
-    productSaveMsg.textContent = "Erro ao salvar: " + err.message;
+    productSaveMsg.textContent = "Não deu para salvar: " + err.message;
     productSaveMsg.classList.add("error");
   } finally {
     productSaveBtn.disabled = false;
+    productSaveBtn.textContent = "Salvar";
   }
 });
 
-async function deleteProduct(id) {
-  const p = ADMIN_PRODUCTS.find(p => p.id === id);
-  if (!confirm(`Excluir o produto "${p ? p.name : ""}"? Essa ação não pode ser desfeita.`)) return;
-  const { error } = await sb.from("products").delete().eq("id", id);
-  if (error) {
-    showToast("Erro ao excluir: " + error.message);
-    return;
+// ==== UPLOAD DE IMAGEM ====
+// Fotos do celular chegam com 3–8 MB; reduzimos antes de enviar.
+async function shrinkImage(file, maxSize) {
+  if (!maxSize || !/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type)) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
   }
-  showToast("Produto excluído");
-  await loadAllData();
 }
 
-// ==== UPLOAD DE IMAGEM ====
-async function uploadImage(file, folder) {
+async function uploadImage(rawFile, folder, { maxSize } = {}) {
+  const file = await shrinkImage(rawFile, maxSize);
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const safeBase = slugify(file.name.replace(/\.[^.]+$/, "")) || "img";
   const path = `${folder}/${Date.now()}-${safeBase}.${ext}`;
 
   const { error: uploadError } = await sb.storage.from(STORE_IMAGES_BUCKET).upload(path, file, {
     cacheControl: "3600",
-    upsert: false
+    upsert: false,
+    contentType: file.type || undefined
   });
   if (uploadError) throw uploadError;
 
@@ -294,49 +647,51 @@ async function uploadImage(file, folder) {
   return data.publicUrl;
 }
 
-// ==== CATEGORIAS: TABELA ====
-const categoriesTableBody = document.getElementById("categoriesTableBody");
+// ==== CATEGORIAS ====
+const categoriesList = $("categoriesList");
 
-function renderCategoriesTable() {
+function renderCategoriesList() {
   if (ADMIN_CATEGORIES.length === 0) {
-    categoriesTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Nenhuma categoria.</td></tr>`;
+    categoriesList.innerHTML = `<li class="list-empty"><strong>Nenhuma categoria</strong>Crie uma para separar os perfumes no site.</li>`;
     return;
   }
-  categoriesTableBody.innerHTML = ADMIN_CATEGORIES.map(c => `
-    <tr data-id="${c.id}">
-      <td>${escapeHtml(c.label)}</td>
-      <td><code>${escapeHtml(c.id)}</code></td>
-      <td>${c.sort_order}</td>
-      <td>
-        <div class="admin-table-actions">
-          <button class="btn-admin-small" data-action="edit-category" data-id="${c.id}">Editar</button>
-          <button class="btn-admin-danger" data-action="delete-category" data-id="${c.id}">Excluir</button>
-        </div>
-      </td>
-    </tr>
-  `).join("");
+  categoriesList.innerHTML = ADMIN_CATEGORIES.map(c => {
+    const total = ADMIN_PRODUCTS.filter(p => p.category === c.id);
+    const on = total.filter(isActive).length;
+    return `
+    <li class="simple-row" data-id="${escapeHtml(c.id)}">
+      <button type="button" class="row-main" data-action="edit">
+        <span class="row-text">
+          <span class="row-name">${escapeHtml(c.label)}</span>
+          <span class="row-meta"><span>${plural(total.length, "perfume", "perfumes")}</span><span>${on} no site</span><span>Ordem ${c.sort_order}</span></span>
+        </span>
+      </button>
+      <div class="row-actions">
+        <button type="button" class="btn-icon" data-action="delete" aria-label="Excluir categoria ${escapeHtml(c.label)}"><svg class="icon"><use href="#i-trash"/></svg></button>
+      </div>
+    </li>`;
+  }).join("");
 }
 
-categoriesTableBody.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-action]");
+categoriesList.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-action]");
   if (!btn) return;
-  const id = btn.dataset.id;
-  if (btn.dataset.action === "edit-category") openCategoryModal(id);
-  if (btn.dataset.action === "delete-category") deleteCategory(id);
+  const id = btn.closest(".simple-row").dataset.id;
+  if (btn.dataset.action === "edit") openCategoryModal(id);
+  if (btn.dataset.action === "delete") deleteCategory(id);
 });
 
-// ==== CATEGORIAS: MODAL ====
-const categoryModalOverlay = document.getElementById("categoryModalOverlay");
-const categoryForm = document.getElementById("categoryForm");
-const categoryModalTitle = document.getElementById("categoryModalTitle");
-const categoryOriginalIdInput = document.getElementById("categoryOriginalId");
-const categoryLabelInput = document.getElementById("categoryLabel");
-const categoryIdInput = document.getElementById("categoryId");
-const categorySortInput = document.getElementById("categorySort");
-const categorySaveMsg = document.getElementById("categorySaveMsg");
+const categoryModalOverlay = $("categoryModalOverlay");
+const categoryForm = $("categoryForm");
+const categoryModalTitle = $("categoryModalTitle");
+const categoryOriginalIdInput = $("categoryOriginalId");
+const categoryLabelInput = $("categoryLabel");
+const categoryIdInput = $("categoryId");
+const categorySortInput = $("categorySort");
+const categorySaveMsg = $("categorySaveMsg");
 
-document.getElementById("newCategoryBtn").addEventListener("click", () => openCategoryModal(null));
-document.getElementById("categoryCancelBtn").addEventListener("click", () => categoryModalOverlay.hidden = true);
+$("newCategoryBtn").addEventListener("click", () => openCategoryModal(null));
+$("categoryCancelBtn").addEventListener("click", () => closeSheet(categoryModalOverlay));
 
 let categoryIdManuallyEdited = false;
 categoryIdInput.addEventListener("input", () => { categoryIdManuallyEdited = true; });
@@ -347,6 +702,7 @@ categoryLabelInput.addEventListener("input", () => {
 function openCategoryModal(id) {
   categoryForm.reset();
   categorySaveMsg.textContent = "";
+  categorySaveMsg.classList.remove("error");
   categoryIdManuallyEdited = false;
 
   if (id) {
@@ -362,103 +718,100 @@ function openCategoryModal(id) {
     categoryOriginalIdInput.value = "";
     categorySortInput.value = ADMIN_CATEGORIES.length;
   }
-  categoryModalOverlay.hidden = false;
+  openSheet(categoryModalOverlay);
 }
 
 categoryForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   categorySaveMsg.classList.remove("error");
-  categorySaveMsg.textContent = "Salvando...";
+  categorySaveMsg.textContent = "Salvando…";
 
   const originalId = categoryOriginalIdInput.value;
-  const newId = slugify(categoryIdInput.value);
   const payload = {
-    id: newId,
+    id: slugify(categoryIdInput.value),
     label: categoryLabelInput.value.trim(),
     sort_order: Number(categorySortInput.value) || 0
   };
 
   try {
     let error;
-    if (originalId) {
-      // Se o identificador mudou, atualiza id (products.category segue via FK on update cascade)
-      ({ error } = await sb.from("categories").update(payload).eq("id", originalId));
-    } else {
-      ({ error } = await sb.from("categories").insert(payload));
-    }
+    if (originalId) ({ error } = await sb.from("categories").update(payload).eq("id", originalId));
+    else ({ error } = await sb.from("categories").insert(payload));
     if (error) throw error;
 
-    categoryModalOverlay.hidden = true;
+    closeSheet(categoryModalOverlay);
     showToast("Categoria salva");
     await loadAllData();
   } catch (err) {
-    categorySaveMsg.textContent = "Erro ao salvar: " + err.message;
+    categorySaveMsg.textContent = "Não deu para salvar: " + err.message;
     categorySaveMsg.classList.add("error");
   }
 });
 
 async function deleteCategory(id) {
-  const inUse = ADMIN_PRODUCTS.some(p => p.category === id);
-  if (inUse) {
-    alert("Essa categoria tem produtos vinculados. Mova ou exclua os produtos antes de remover a categoria.");
-    return;
-  }
   const c = ADMIN_CATEGORIES.find(c => c.id === id);
-  if (!confirm(`Excluir a categoria "${c ? c.label : ""}"?`)) return;
-  const { error } = await sb.from("categories").delete().eq("id", id);
-  if (error) {
-    showToast("Erro ao excluir: " + error.message);
+  const inUse = ADMIN_PRODUCTS.filter(p => p.category === id).length;
+  if (inUse) {
+    await askConfirm({
+      title: "Essa categoria tem perfumes",
+      text: `"${c ? c.label : id}" tem ${plural(inUse, "perfume", "perfumes")}. Mude eles de categoria ou exclua antes de remover a categoria.`,
+      yes: "Entendi"
+    });
     return;
   }
+  const ok = await askConfirm({ title: "Excluir categoria?", text: `"${c ? c.label : ""}" vai sair do site.` });
+  if (!ok) return;
+  const { error } = await sb.from("categories").delete().eq("id", id);
+  if (error) { showToast("Não deu para excluir: " + error.message); return; }
   showToast("Categoria excluída");
   await loadAllData();
 }
 
-// ==== BANNER: TABELA ====
-const bannersTableBody = document.getElementById("bannersTableBody");
+// ==== BANNERS ====
+const bannersList = $("bannersList");
 
-function renderBannersTable() {
+function renderBannersList() {
   if (ADMIN_BANNERS.length === 0) {
-    bannersTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Nenhum banner cadastrado.</td></tr>`;
+    bannersList.innerHTML = `<li class="list-empty"><strong>Nenhum banner</strong>Sem banner, o site mostra o padrão da loja.</li>`;
     return;
   }
-  bannersTableBody.innerHTML = ADMIN_BANNERS.map(b => `
-    <tr data-id="${b.id}">
-      <td><img class="admin-table-thumb" src="${b.image_url}" alt=""></td>
-      <td>${escapeHtml(b.badge_text || "—")}</td>
-      <td>${b.sort_order}</td>
-      <td>
-        <div class="admin-table-actions">
-          <button class="btn-admin-small" data-action="edit-banner" data-id="${b.id}">Editar</button>
-          <button class="btn-admin-danger" data-action="delete-banner" data-id="${b.id}">Excluir</button>
-        </div>
-      </td>
-    </tr>
+  bannersList.innerHTML = ADMIN_BANNERS.map(b => `
+    <li class="simple-row" data-id="${b.id}">
+      <button type="button" class="row-main" data-action="edit">
+        <img class="row-thumb-wide" src="${escapeHtml(b.image_url)}" alt="" loading="lazy">
+        <span class="row-text">
+          <span class="row-name">${escapeHtml(b.badge_text || "Sem selo")}</span>
+          <span class="row-meta"><span>Ordem ${b.sort_order}</span></span>
+        </span>
+      </button>
+      <div class="row-actions">
+        <button type="button" class="btn-icon" data-action="delete" aria-label="Excluir banner"><svg class="icon"><use href="#i-trash"/></svg></button>
+      </div>
+    </li>
   `).join("");
 }
 
-bannersTableBody.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-action]");
+bannersList.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-action]");
   if (!btn) return;
-  const id = btn.dataset.id;
-  if (btn.dataset.action === "edit-banner") openBannerModal(id);
-  if (btn.dataset.action === "delete-banner") deleteBanner(id);
+  const id = btn.closest(".simple-row").dataset.id;
+  if (btn.dataset.action === "edit") openBannerModal(id);
+  if (btn.dataset.action === "delete") deleteBanner(id);
 });
 
-// ==== BANNER: MODAL ====
-const bannerModalOverlay = document.getElementById("bannerModalOverlay");
-const bannerForm = document.getElementById("bannerForm");
-const bannerModalTitle = document.getElementById("bannerModalTitle");
-const bannerIdInput = document.getElementById("bannerId");
-const bannerImageFile = document.getElementById("bannerImageFile");
-const bannerImagePreview = document.getElementById("bannerImagePreview");
-const bannerBadgeTextInput = document.getElementById("bannerBadgeText");
-const bannerSortInput = document.getElementById("bannerSort");
-const bannerSaveMsg = document.getElementById("bannerSaveMsg");
-const bannerSaveBtn = document.getElementById("bannerSaveBtn");
+const bannerModalOverlay = $("bannerModalOverlay");
+const bannerForm = $("bannerForm");
+const bannerModalTitle = $("bannerModalTitle");
+const bannerIdInput = $("bannerId");
+const bannerImageFile = $("bannerImageFile");
+const bannerImagePreview = $("bannerImagePreview");
+const bannerBadgeTextInput = $("bannerBadgeText");
+const bannerSortInput = $("bannerSort");
+const bannerSaveMsg = $("bannerSaveMsg");
+const bannerSaveBtn = $("bannerSaveBtn");
 
-document.getElementById("newBannerBtn").addEventListener("click", () => openBannerModal(null));
-document.getElementById("bannerCancelBtn").addEventListener("click", () => bannerModalOverlay.hidden = true);
+$("newBannerBtn").addEventListener("click", () => openBannerModal(null));
+$("bannerCancelBtn").addEventListener("click", () => closeSheet(bannerModalOverlay));
 
 function openBannerModal(id) {
   bannerForm.reset();
@@ -469,44 +822,43 @@ function openBannerModal(id) {
     const b = ADMIN_BANNERS.find(b => b.id === id);
     bannerModalTitle.textContent = "Editar banner";
     bannerIdInput.value = b.id;
-    bannerImagePreview.src = b.image_url;
+    setPhotoPreview(bannerImagePreview, b.image_url);
     bannerBadgeTextInput.value = b.badge_text || "";
     bannerSortInput.value = b.sort_order;
   } else {
     bannerModalTitle.textContent = "Novo banner";
     bannerIdInput.value = "";
-    bannerImagePreview.src = "";
+    setPhotoPreview(bannerImagePreview, "");
     bannerSortInput.value = ADMIN_BANNERS.length;
   }
-  bannerModalOverlay.hidden = false;
+  syncPhotoLabels(bannerImagePreview, $("bannerPhotoEmpty"), $("bannerPhotoChange"));
+  openSheet(bannerModalOverlay);
 }
 
 bannerImageFile.addEventListener("change", () => {
   const file = bannerImageFile.files[0];
-  if (file) bannerImagePreview.src = URL.createObjectURL(file);
+  if (file) setPhotoPreview(bannerImagePreview, URL.createObjectURL(file));
+  syncPhotoLabels(bannerImagePreview, $("bannerPhotoEmpty"), $("bannerPhotoChange"));
 });
 
 bannerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  bannerSaveBtn.disabled = true;
   bannerSaveMsg.classList.remove("error");
-  bannerSaveMsg.textContent = "Salvando...";
+  bannerSaveMsg.textContent = "";
 
+  const id = bannerIdInput.value;
+  let imgUrl = id ? ADMIN_BANNERS.find(b => b.id === id).image_url : "";
+  const file = bannerImageFile.files[0];
+  if (!imgUrl && !file) {
+    bannerSaveMsg.textContent = "Escolha uma imagem para o banner.";
+    bannerSaveMsg.classList.add("error");
+    return;
+  }
+
+  bannerSaveBtn.disabled = true;
+  bannerSaveBtn.textContent = file ? "Enviando imagem…" : "Salvando…";
   try {
-    const id = bannerIdInput.value;
-    let imgUrl = id ? ADMIN_BANNERS.find(b => b.id === id).image_url : "";
-
-    const file = bannerImageFile.files[0];
-    if (file) {
-      imgUrl = await uploadImage(file, "banners");
-    }
-
-    if (!imgUrl) {
-      bannerSaveMsg.textContent = "Escolha uma imagem para o banner.";
-      bannerSaveMsg.classList.add("error");
-      bannerSaveBtn.disabled = false;
-      return;
-    }
+    if (file) imgUrl = await uploadImage(file, "banners", { maxSize: 1600 });
 
     const payload = {
       image_url: imgUrl,
@@ -515,45 +867,42 @@ bannerForm.addEventListener("submit", async (e) => {
     };
 
     let error;
-    if (id) {
-      ({ error } = await sb.from("banners").update(payload).eq("id", id));
-    } else {
-      ({ error } = await sb.from("banners").insert(payload));
-    }
+    if (id) ({ error } = await sb.from("banners").update(payload).eq("id", id));
+    else ({ error } = await sb.from("banners").insert(payload));
     if (error) throw error;
 
-    bannerModalOverlay.hidden = true;
+    closeSheet(bannerModalOverlay);
     showToast(id ? "Banner atualizado" : "Banner criado");
     await loadAllData();
   } catch (err) {
-    bannerSaveMsg.textContent = "Erro ao salvar: " + err.message;
+    bannerSaveMsg.textContent = "Não deu para salvar: " + err.message;
     bannerSaveMsg.classList.add("error");
   } finally {
     bannerSaveBtn.disabled = false;
+    bannerSaveBtn.textContent = "Salvar";
   }
 });
 
 async function deleteBanner(id) {
-  if (!confirm("Excluir este banner?")) return;
+  const ok = await askConfirm({ title: "Excluir banner?", text: "A imagem sai do topo do site." });
+  if (!ok) return;
   const { error } = await sb.from("banners").delete().eq("id", id);
-  if (error) {
-    showToast("Erro ao excluir: " + error.message);
-    return;
-  }
+  if (error) { showToast("Não deu para excluir: " + error.message); return; }
   showToast("Banner excluído");
   await loadAllData();
 }
 
-// ==== CONFIGURAÇÕES ====
-const settingsForm = document.getElementById("settingsForm");
-const settingStoreName = document.getElementById("settingStoreName");
-const settingWhatsapp = document.getElementById("settingWhatsapp");
-const settingInstagram = document.getElementById("settingInstagram");
-const settingLogoFile = document.getElementById("settingLogoFile");
-const settingLogoPreview = document.getElementById("settingLogoPreview");
-const settingsSaveMsg = document.getElementById("settingsSaveMsg");
-const settingMsgBuy = document.getElementById("settingMsgBuy");
-const settingMsgCart = document.getElementById("settingMsgCart");
+// ==== AJUSTES ====
+const settingsForm = $("settingsForm");
+const settingStoreName = $("settingStoreName");
+const settingWhatsapp = $("settingWhatsapp");
+const settingInstagram = $("settingInstagram");
+const settingLogoFile = $("settingLogoFile");
+const settingLogoPreview = $("settingLogoPreview");
+const settingsSaveMsg = $("settingsSaveMsg");
+const settingsSaveBtn = $("settingsSaveBtn");
+const settingMsgBuy = $("settingMsgBuy");
+const settingMsgCart = $("settingMsgCart");
 
 const DEFAULT_MSG_BUY = "Olá! Tenho interesse em comprar:\n\n1x {produto} - {preco}\n\nTotal: {total}";
 const DEFAULT_MSG_CART = "Olá! Gostaria de fazer o seguinte pedido na {loja}:\n\n{itens}\n\nTotal: {total}";
@@ -562,32 +911,32 @@ function fillSettingsForm() {
   settingStoreName.value = ADMIN_SETTINGS.store_name || "";
   settingWhatsapp.value = ADMIN_SETTINGS.whatsapp_number || "";
   settingInstagram.value = ADMIN_SETTINGS.instagram || "";
-  settingLogoPreview.src = ADMIN_SETTINGS.logo_url || "assets/logo/logo.png";
+  setPhotoPreview(settingLogoPreview, ADMIN_SETTINGS.logo_url || "assets/logo/logo.png");
   settingMsgBuy.value = ADMIN_SETTINGS.whatsapp_msg_buy || DEFAULT_MSG_BUY;
   settingMsgCart.value = ADMIN_SETTINGS.whatsapp_msg_cart || DEFAULT_MSG_CART;
 }
 
 settingLogoFile.addEventListener("change", () => {
   const file = settingLogoFile.files[0];
-  if (file) settingLogoPreview.src = URL.createObjectURL(file);
+  if (file) setPhotoPreview(settingLogoPreview, URL.createObjectURL(file));
 });
 
 settingsForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   settingsSaveMsg.classList.remove("error");
-  settingsSaveMsg.textContent = "Salvando...";
+  settingsSaveMsg.textContent = "";
+  settingsSaveBtn.disabled = true;
+  settingsSaveBtn.textContent = "Salvando…";
 
   try {
     let logoUrl = ADMIN_SETTINGS.logo_url || "";
     const file = settingLogoFile.files[0];
-    if (file) {
-      logoUrl = await uploadImage(file, "logo");
-    }
+    if (file) logoUrl = await uploadImage(file, "logo");
 
     const rows = [
       { key: "store_name", value: settingStoreName.value.trim() },
-      { key: "whatsapp_number", value: settingWhatsapp.value.trim() },
-      { key: "instagram", value: settingInstagram.value.trim() },
+      { key: "whatsapp_number", value: settingWhatsapp.value.replace(/\D/g, "") },
+      { key: "instagram", value: settingInstagram.value.trim().replace(/^@/, "") },
       { key: "logo_url", value: logoUrl },
       { key: "whatsapp_msg_buy", value: settingMsgBuy.value.trim() || DEFAULT_MSG_BUY },
       { key: "whatsapp_msg_cart", value: settingMsgCart.value.trim() || DEFAULT_MSG_CART }
@@ -596,30 +945,33 @@ settingsForm.addEventListener("submit", async (e) => {
     const { error } = await sb.from("settings").upsert(rows);
     if (error) throw error;
 
-    settingsSaveMsg.textContent = "Configurações salvas!";
+    showToast("Ajustes salvos");
     await loadAllData();
   } catch (err) {
-    settingsSaveMsg.textContent = "Erro ao salvar: " + err.message;
+    settingsSaveMsg.textContent = "Não deu para salvar: " + err.message;
     settingsSaveMsg.classList.add("error");
+  } finally {
+    settingsSaveBtn.disabled = false;
+    settingsSaveBtn.textContent = "Salvar ajustes";
   }
 });
 
 // ==== ADMINISTRADORES ====
-const adminsTableBody = document.getElementById("adminsTableBody");
-const adminsListMsg = document.getElementById("adminsListMsg");
-const adminModalOverlay = document.getElementById("adminModalOverlay");
-const adminForm = document.getElementById("adminForm");
-const adminEmailInput = document.getElementById("adminEmail");
-const adminPasswordInput = document.getElementById("adminPassword");
-const adminSaveMsg = document.getElementById("adminSaveMsg");
-const adminSaveBtn = document.getElementById("adminSaveBtn");
+const adminsList = $("adminsList");
+const adminsListMsg = $("adminsListMsg");
+const adminModalOverlay = $("adminModalOverlay");
+const adminForm = $("adminForm");
+const adminEmailInput = $("adminEmail");
+const adminPasswordInput = $("adminPassword");
+const adminSaveMsg = $("adminSaveMsg");
+const adminSaveBtn = $("adminSaveBtn");
 
 let currentAdminUserId = null;
 
 async function callAdminUsersFn(payload) {
   const { data: sessionData } = await sb.auth.getSession();
   const token = sessionData?.session?.access_token;
-  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+  if (!token) throw new Error("Sessão expirada. Entre de novo.");
 
   const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-users`, {
     method: "POST",
@@ -635,92 +987,93 @@ async function callAdminUsersFn(payload) {
   return json;
 }
 
-function formatDateTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("pt-BR");
+function formatDate(iso) {
+  if (!iso) return "nunca";
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 async function loadAdmins() {
-  adminsListMsg.textContent = "Carregando...";
+  adminsListMsg.textContent = "";
   adminsListMsg.classList.remove("error");
   try {
     const { data: sessionData } = await sb.auth.getSession();
     currentAdminUserId = sessionData?.session?.user?.id || null;
-
     const { users } = await callAdminUsersFn({ action: "list" });
-    renderAdminsTable(users || []);
-    adminsListMsg.textContent = "";
+    renderAdminsList(users || []);
   } catch (err) {
-    adminsListMsg.textContent = "Erro ao carregar administradores: " + err.message;
+    adminsList.innerHTML = "";
+    adminsListMsg.textContent = "Não consegui carregar a lista: " + err.message;
     adminsListMsg.classList.add("error");
   }
 }
 
-function renderAdminsTable(users) {
+function renderAdminsList(users) {
   if (users.length === 0) {
-    adminsTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Nenhum administrador.</td></tr>`;
+    adminsList.innerHTML = `<li class="list-empty">Ninguém além de você.</li>`;
     return;
   }
-  adminsTableBody.innerHTML = users.map(u => `
-    <tr data-id="${u.id}">
-      <td>${escapeHtml(u.email)}${u.id === currentAdminUserId ? " <em>(você)</em>" : ""}</td>
-      <td>${formatDateTime(u.created_at)}</td>
-      <td>${formatDateTime(u.last_sign_in_at)}</td>
-      <td>
-        <div class="admin-table-actions">
-          ${u.id === currentAdminUserId ? "" : `<button class="btn-admin-danger" data-action="delete-admin" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Remover</button>`}
-        </div>
-      </td>
-    </tr>
+  adminsList.innerHTML = users.map(u => `
+    <li class="simple-row">
+      <span class="row-main" style="cursor:default">
+        <span class="row-text">
+          <span class="row-name">${escapeHtml(u.email)}${u.id === currentAdminUserId ? ` <span class="row-badge">você</span>` : ""}</span>
+          <span class="row-meta"><span>Último acesso: ${formatDate(u.last_sign_in_at)}</span></span>
+        </span>
+      </span>
+      <div class="row-actions">
+        ${u.id === currentAdminUserId ? "" : `<button type="button" class="btn-icon" data-action="delete-admin" data-id="${u.id}" data-email="${escapeHtml(u.email)}" aria-label="Remover acesso de ${escapeHtml(u.email)}"><svg class="icon"><use href="#i-trash"/></svg></button>`}
+      </div>
+    </li>
   `).join("");
 }
 
-adminsTableBody.addEventListener("click", async (e) => {
+adminsList.addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-action='delete-admin']");
   if (!btn) return;
-  const id = btn.dataset.id;
-  const email = btn.dataset.email;
-  if (!confirm(`Remover o acesso de "${email}"? Essa pessoa não poderá mais entrar no painel.`)) return;
+  const ok = await askConfirm({
+    title: "Remover acesso?",
+    text: `${btn.dataset.email} não vai mais conseguir entrar no painel.`,
+    yes: "Remover"
+  });
+  if (!ok) return;
   try {
-    await callAdminUsersFn({ action: "delete", userId: id });
-    showToast("Administrador removido");
+    await callAdminUsersFn({ action: "delete", userId: btn.dataset.id });
+    showToast("Acesso removido");
     await loadAdmins();
   } catch (err) {
-    showToast("Erro ao remover: " + err.message);
+    showToast("Não deu para remover: " + err.message);
   }
 });
 
-document.getElementById("newAdminBtn").addEventListener("click", () => {
+$("newAdminBtn").addEventListener("click", () => {
   adminForm.reset();
   adminSaveMsg.textContent = "";
   adminSaveMsg.classList.remove("error");
-  adminModalOverlay.hidden = false;
+  openSheet(adminModalOverlay);
 });
-
-document.getElementById("adminCancelBtn").addEventListener("click", () => {
-  adminModalOverlay.hidden = true;
-});
+$("adminCancelBtn").addEventListener("click", () => closeSheet(adminModalOverlay));
 
 adminForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   adminSaveBtn.disabled = true;
+  adminSaveBtn.textContent = "Salvando…";
   adminSaveMsg.classList.remove("error");
-  adminSaveMsg.textContent = "Salvando...";
-
+  adminSaveMsg.textContent = "";
   try {
     await callAdminUsersFn({
       action: "create",
       email: adminEmailInput.value.trim(),
       password: adminPasswordInput.value
     });
-    adminModalOverlay.hidden = true;
-    showToast("Administrador adicionado");
+    closeSheet(adminModalOverlay);
+    showToast("Acesso criado");
     await loadAdmins();
   } catch (err) {
-    adminSaveMsg.textContent = "Erro ao salvar: " + err.message;
+    adminSaveMsg.textContent = "Não deu para salvar: " + err.message;
     adminSaveMsg.classList.add("error");
   } finally {
     adminSaveBtn.disabled = false;
+    adminSaveBtn.textContent = "Salvar";
   }
 });
 

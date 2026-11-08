@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a3fae">
 <title>Admin | Líder Store</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/logo/logo-icon.png">
@@ -12,20 +13,41 @@
 </head>
 <body class="admin-body">
 
+<!-- ÍCONES -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-bottle" viewBox="0 0 24 24"><path d="M10 2h4v3h-4zM9 5h6v2l2 2v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9l2-2z"/><path d="M7 13h10"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.7 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-select" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  </defs>
+</svg>
+
 <!-- LOGIN -->
 <div class="admin-login-wrap" id="loginWrap">
   <form class="admin-login-card" id="loginForm">
     <img src="assets/logo/logo.png" alt="Líder Store" class="admin-login-logo">
-    <h1>Painel Admin</h1>
-    <p class="admin-login-sub">Líder Store</p>
+    <h1>Painel da loja</h1>
     <label>E-mail
-      <input type="email" id="loginEmail" required autocomplete="username">
+      <input type="email" id="loginEmail" required autocomplete="username" inputmode="email">
     </label>
     <label>Senha
       <input type="password" id="loginPassword" required autocomplete="current-password">
     </label>
-    <button type="submit" class="btn-admin-primary">Entrar</button>
-    <p class="admin-login-error" id="loginError"></p>
+    <button type="submit" class="abtn abtn-primary abtn-block" id="loginBtn">Entrar</button>
+    <p class="admin-login-error" id="loginError" role="alert"></p>
   </form>
 </div>
 
@@ -33,259 +55,330 @@
 <div class="admin-dashboard" id="dashboard" hidden>
   <header class="admin-header">
     <div class="admin-header-brand">
-      <img src="assets/logo/logo.png" alt="" class="admin-header-logo">
-      <span>Painel Admin — Líder Store</span>
+      <img src="assets/logo/logo.png" alt="" class="admin-header-logo" id="headerLogo">
+      <div class="admin-header-title">
+        <strong>Líder Store</strong>
+        <span class="admin-user-email" id="userEmail"></span>
+      </div>
     </div>
+    <nav class="admin-tabs" aria-label="Seções">
+      <button class="admin-tab active" data-tab="produtos"><svg class="icon"><use href="#i-bottle"/></svg><span>Perfumes</span></button>
+      <button class="admin-tab" data-tab="categorias"><svg class="icon"><use href="#i-tag"/></svg><span>Categorias</span></button>
+      <button class="admin-tab" data-tab="banner"><svg class="icon"><use href="#i-image"/></svg><span>Banners</span></button>
+      <button class="admin-tab" data-tab="config"><svg class="icon"><use href="#i-gear"/></svg><span>Ajustes</span></button>
+    </nav>
     <div class="admin-header-actions">
-      <span class="admin-user-email" id="userEmail"></span>
-      <a href="index.html" target="_blank" class="btn-admin-ghost">Ver site</a>
-      <button class="btn-admin-ghost" id="logoutBtn">Sair</button>
+      <a href="index.html" target="_blank" rel="noopener" class="btn-icon" aria-label="Ver site" title="Ver site"><svg class="icon"><use href="#i-external"/></svg></a>
+      <button class="btn-icon" id="logoutBtn" aria-label="Sair" title="Sair"><svg class="icon"><use href="#i-logout"/></svg></button>
     </div>
   </header>
 
-  <nav class="admin-tabs">
-    <button class="admin-tab active" data-tab="produtos">Produtos</button>
-    <button class="admin-tab" data-tab="categorias">Categorias</button>
-    <button class="admin-tab" data-tab="banner">Banner</button>
-    <button class="admin-tab" data-tab="config">Configurações</button>
-  </nav>
-
   <main class="admin-content">
 
-    <!-- PRODUTOS -->
+    <!-- PERFUMES -->
     <section class="admin-panel" id="panel-produtos">
-      <div class="admin-panel-header">
-        <h2>Produtos</h2>
-        <button class="btn-admin-primary" id="newProductBtn">+ Novo produto</button>
+      <div class="panel-head">
+        <div>
+          <h2>Perfumes</h2>
+          <p class="panel-sub" id="productsSummary">Carregando…</p>
+        </div>
+        <div class="panel-head-actions">
+          <button class="abtn abtn-ghost" id="selectModeBtn"><svg class="icon"><use href="#i-select"/></svg><span>Selecionar</span></button>
+          <button class="abtn abtn-primary desktop-only" id="newProductBtn"><svg class="icon"><use href="#i-plus"/></svg><span>Novo perfume</span></button>
+        </div>
       </div>
-      <div class="admin-filter-row">
-        <input type="text" id="productSearch" placeholder="Buscar produto...">
-        <select id="productCategoryFilter">
+
+      <div class="toolbar">
+        <label class="search-field">
+          <svg class="icon"><use href="#i-search"/></svg>
+          <input type="search" id="productSearch" placeholder="Buscar perfume" autocomplete="off" enterkeyhint="search">
+        </label>
+        <select id="productCategoryFilter" aria-label="Categoria">
           <option value="">Todas as categorias</option>
         </select>
       </div>
-      <div class="admin-table-wrap">
-        <table class="admin-table">
-          <thead>
-            <tr><th></th><th>Nome</th><th>Categoria</th><th>Preço</th><th></th></tr>
-          </thead>
-          <tbody id="productsTableBody"></tbody>
-        </table>
+
+      <div class="segmented" role="tablist" aria-label="Filtrar por situação" id="statusFilter">
+        <button role="tab" class="seg active" data-status="all">Todos <span class="count" id="countAll">0</span></button>
+        <button role="tab" class="seg" data-status="active">No site <span class="count" id="countActive">0</span></button>
+        <button role="tab" class="seg" data-status="hidden">Ocultos <span class="count" id="countHidden">0</span></button>
       </div>
+
+      <div class="select-all-row" id="selectAllRow" hidden>
+        <label class="check-label">
+          <input type="checkbox" id="selectAllCheckbox">
+          <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
+          <span id="selectAllLabel">Selecionar todos os que aparecem</span>
+        </label>
+      </div>
+
+      <ul class="product-list" id="productList" aria-live="polite"></ul>
     </section>
 
     <!-- CATEGORIAS -->
     <section class="admin-panel" id="panel-categorias" hidden>
-      <div class="admin-panel-header">
-        <h2>Categorias</h2>
-        <button class="btn-admin-primary" id="newCategoryBtn">+ Nova categoria</button>
+      <div class="panel-head">
+        <div>
+          <h2>Categorias</h2>
+          <p class="panel-sub">As abas que aparecem no topo do catálogo.</p>
+        </div>
+        <div class="panel-head-actions">
+          <button class="abtn abtn-primary" id="newCategoryBtn"><svg class="icon"><use href="#i-plus"/></svg><span>Nova categoria</span></button>
+        </div>
       </div>
-      <div class="admin-table-wrap">
-        <table class="admin-table">
-          <thead>
-            <tr><th>Nome exibido</th><th>Identificador</th><th>Ordem</th><th></th></tr>
-          </thead>
-          <tbody id="categoriesTableBody"></tbody>
-        </table>
-      </div>
+      <ul class="simple-list" id="categoriesList"></ul>
     </section>
 
-    <!-- BANNER -->
+    <!-- BANNERS -->
     <section class="admin-panel" id="panel-banner" hidden>
-      <div class="admin-panel-header">
-        <h2>Banner da página inicial</h2>
-        <button class="btn-admin-primary" id="newBannerBtn">+ Novo banner</button>
+      <div class="panel-head">
+        <div>
+          <h2>Banners</h2>
+          <p class="panel-sub">Imagens que passam no topo do site. Use 1200×600 e deixe o texto no centro: no computador a imagem corta um pouco em cima e embaixo.</p>
+        </div>
+        <div class="panel-head-actions">
+          <button class="abtn abtn-primary" id="newBannerBtn"><svg class="icon"><use href="#i-plus"/></svg><span>Novo banner</span></button>
+        </div>
       </div>
-      <p class="admin-hint" style="margin-top:-8px;margin-bottom:14px;">As imagens aparecem em rotação no topo do site. Tamanho recomendado: 1200x600px (proporção 2:1). Mantenha o conteúdo principal (texto/logo) centralizado — no computador a imagem é cortada um pouco em cima/embaixo, e no celular ela aparece por inteiro.</p>
-      <div class="admin-table-wrap">
-        <table class="admin-table">
-          <thead>
-            <tr><th></th><th>Texto do selo</th><th>Ordem</th><th></th></tr>
-          </thead>
-          <tbody id="bannersTableBody"></tbody>
-        </table>
-      </div>
+      <ul class="simple-list" id="bannersList"></ul>
     </section>
 
-    <!-- CONFIGURAÇÕES -->
+    <!-- AJUSTES -->
     <section class="admin-panel" id="panel-config" hidden>
-      <h2>Configurações da loja</h2>
-      <form class="admin-settings-form" id="settingsForm">
-        <div class="admin-settings-grid">
-          <div class="admin-field">
+      <div class="panel-head">
+        <div><h2>Ajustes da loja</h2></div>
+      </div>
+      <form class="settings-form" id="settingsForm">
+        <div class="settings-grid">
+          <div class="field">
             <label for="settingStoreName">Nome da loja</label>
             <input type="text" id="settingStoreName">
           </div>
-          <div class="admin-field">
-            <label for="settingWhatsapp">WhatsApp (com DDI+DDD, só números)</label>
-            <input type="text" id="settingWhatsapp" placeholder="5532999999999">
+          <div class="field">
+            <label for="settingWhatsapp">WhatsApp</label>
+            <input type="tel" id="settingWhatsapp" placeholder="5532999999999" inputmode="numeric">
+            <p class="hint">Com 55 + DDD, só números.</p>
           </div>
-          <div class="admin-field">
-            <label for="settingInstagram">Instagram (sem @)</label>
-            <input type="text" id="settingInstagram" placeholder="liderstoresf">
+          <div class="field">
+            <label for="settingInstagram">Instagram</label>
+            <input type="text" id="settingInstagram" placeholder="liderstoresf" autocapitalize="off">
+            <p class="hint">Sem o @.</p>
           </div>
-          <div class="admin-field">
-            <label for="settingLogoFile">Logo da loja</label>
-            <div class="admin-logo-row">
-              <img id="settingLogoPreview" class="admin-logo-preview" alt="Logo atual">
+          <div class="field">
+            <span class="field-label">Logo da loja</span>
+            <label class="photo-pick photo-pick-small">
+              <img id="settingLogoPreview" alt="Logo atual">
+              <span class="photo-pick-text">Trocar logo</span>
               <input type="file" id="settingLogoFile" accept="image/*">
-            </div>
+            </label>
           </div>
         </div>
 
-        <div class="admin-field" style="margin-bottom:14px;">
-          <label for="settingMsgBuy">Mensagem do WhatsApp — "Comprar" (produto único)</label>
+        <div class="field">
+          <label for="settingMsgBuy">Mensagem do botão "Comprar"</label>
           <textarea id="settingMsgBuy" rows="4"></textarea>
-          <p class="admin-hint">Use: {produto} {preco} {total}</p>
+          <p class="hint">Use {produto}, {preco} e {total}.</p>
         </div>
 
-        <div class="admin-field" style="margin-bottom:14px;">
-          <label for="settingMsgCart">Mensagem do WhatsApp — Carrinho</label>
+        <div class="field">
+          <label for="settingMsgCart">Mensagem do carrinho</label>
           <textarea id="settingMsgCart" rows="5"></textarea>
-          <p class="admin-hint">Use: {loja} {itens} {total} — {itens} é substituído pela lista de produtos do carrinho.</p>
+          <p class="hint">Use {loja}, {itens} e {total}. {itens} vira a lista do carrinho.</p>
         </div>
 
-        <button type="submit" class="btn-admin-primary">Salvar configurações</button>
-        <p class="admin-save-msg" id="settingsSaveMsg"></p>
+        <div class="form-actions-inline">
+          <button type="submit" class="abtn abtn-primary" id="settingsSaveBtn">Salvar ajustes</button>
+          <p class="save-msg" id="settingsSaveMsg" role="status"></p>
+        </div>
       </form>
 
-      <!-- ADMINISTRADORES -->
-      <div class="admin-config-admins" id="panel-config-admins" style="margin-top:24px;">
-        <div class="admin-panel-header">
-          <h2>Administradores</h2>
-          <button class="btn-admin-primary" id="newAdminBtn">+ Novo admin</button>
+      <div class="admins-block">
+        <div class="panel-head">
+          <div>
+            <h2>Quem acessa o painel</h2>
+            <p class="panel-sub">Qualquer pessoa aqui pode mexer em perfumes, categorias e ajustes.</p>
+          </div>
+          <div class="panel-head-actions">
+            <button class="abtn abtn-ghost" id="newAdminBtn"><svg class="icon"><use href="#i-plus"/></svg><span>Adicionar</span></button>
+          </div>
         </div>
-        <p class="admin-hint" style="margin-top:-8px;margin-bottom:14px;">Pessoas com acesso a este painel. Qualquer admin pode gerenciar produtos, categorias e configurações.</p>
-        <div class="admin-table-wrap">
-          <table class="admin-table">
-            <thead>
-              <tr><th>E-mail</th><th>Criado em</th><th>Último acesso</th><th></th></tr>
-            </thead>
-            <tbody id="adminsTableBody"></tbody>
-          </table>
-        </div>
-        <p class="admin-save-msg" id="adminsListMsg"></p>
+        <ul class="simple-list" id="adminsList"></ul>
+        <p class="save-msg" id="adminsListMsg"></p>
       </div>
     </section>
 
   </main>
-</div>
 
-<!-- MODAL PRODUTO -->
-<div class="admin-modal-overlay" id="productModalOverlay" hidden>
-  <div class="admin-modal">
-    <h2 id="productModalTitle">Novo produto</h2>
-    <form id="productForm">
-      <input type="hidden" id="productId">
-      <div class="admin-field">
-        <label for="productName">Nome</label>
-        <input type="text" id="productName" required>
-      </div>
-      <div class="admin-field">
-        <label for="productPrice">Preço (R$)</label>
-        <input type="number" id="productPrice" min="0" step="0.01" required>
-      </div>
-      <div class="admin-field">
-        <label for="productCategory">Categoria</label>
-        <select id="productCategory" required></select>
-      </div>
-      <div class="admin-field">
-        <label for="productImageFile">Foto do produto</label>
-        <div class="admin-logo-row">
-          <img id="productImagePreview" class="admin-logo-preview" alt="">
-          <input type="file" id="productImageFile" accept="image/*">
-        </div>
-      </div>
-      <div class="admin-modal-actions">
-        <button type="button" class="btn-admin-ghost" id="productCancelBtn">Cancelar</button>
-        <button type="submit" class="btn-admin-primary" id="productSaveBtn">Salvar</button>
-      </div>
-      <p class="admin-save-msg" id="productSaveMsg"></p>
-    </form>
+  <!-- BOTÃO + (celular) -->
+  <button class="fab" id="fabNewProduct" aria-label="Novo perfume"><svg class="icon"><use href="#i-plus"/></svg></button>
+
+  <!-- BARRA DE AÇÕES EM LOTE -->
+  <div class="bulk-bar" id="bulkBar" hidden role="region" aria-label="Ações com os selecionados">
+    <div class="bulk-bar-top">
+      <button class="btn-icon" id="bulkCancelBtn" aria-label="Cancelar seleção"><svg class="icon"><use href="#i-x"/></svg></button>
+      <strong id="bulkCount">0 selecionados</strong>
+    </div>
+    <div class="bulk-actions">
+      <button class="bulk-btn" data-bulk="show"><svg class="icon"><use href="#i-eye"/></svg><span>Mostrar no site</span></button>
+      <button class="bulk-btn" data-bulk="hide"><svg class="icon"><use href="#i-eye-off"/></svg><span>Ocultar</span></button>
+      <button class="bulk-btn bulk-danger" data-bulk="delete"><svg class="icon"><use href="#i-trash"/></svg><span>Excluir</span></button>
+    </div>
   </div>
 </div>
 
-<!-- MODAL CATEGORIA -->
-<div class="admin-modal-overlay" id="categoryModalOverlay" hidden>
-  <div class="admin-modal">
-    <h2 id="categoryModalTitle">Nova categoria</h2>
-    <form id="categoryForm">
+<!-- SHEET PERFUME -->
+<div class="sheet-overlay" id="productModalOverlay" hidden>
+  <form class="sheet" id="productForm" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+    <div class="sheet-head">
+      <button type="button" class="btn-icon" id="productCancelBtn" aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button>
+      <h2 id="productModalTitle">Novo perfume</h2>
+      <span class="sheet-head-spacer"></span>
+    </div>
+    <div class="sheet-body">
+      <input type="hidden" id="productId">
+      <label class="photo-pick">
+        <img id="productImagePreview" alt="">
+        <span class="photo-pick-empty" id="productPhotoEmpty"><svg class="icon"><use href="#i-camera"/></svg>Tirar foto ou escolher da galeria</span>
+        <span class="photo-pick-text" id="productPhotoChange">Trocar foto</span>
+        <input type="file" id="productImageFile" accept="image/*">
+      </label>
+      <div class="field">
+        <label for="productName">Nome</label>
+        <input type="text" id="productName" required placeholder="Ex: 232 Stronger With You - 25ml">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="productPrice">Preço</label>
+          <div class="money-input">
+            <span>R$</span>
+            <input type="text" id="productPrice" required inputmode="decimal" placeholder="0,00" autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label for="productCategory">Categoria</label>
+          <select id="productCategory" required></select>
+        </div>
+      </div>
+      <label class="switch-row">
+        <span>
+          <strong>Aparece no site</strong>
+          <small>Desligue para esconder sem apagar.</small>
+        </span>
+        <input type="checkbox" class="switch" id="productActive" checked>
+      </label>
+      <button type="button" class="btn-text-danger" id="productDeleteBtn" hidden><svg class="icon"><use href="#i-trash"/></svg>Excluir este perfume</button>
+    </div>
+    <div class="sheet-foot">
+      <p class="save-msg" id="productSaveMsg" role="status"></p>
+      <button type="submit" class="abtn abtn-primary abtn-block" id="productSaveBtn">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<!-- SHEET CATEGORIA -->
+<div class="sheet-overlay" id="categoryModalOverlay" hidden>
+  <form class="sheet sheet-short" id="categoryForm" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
+    <div class="sheet-head">
+      <button type="button" class="btn-icon" id="categoryCancelBtn" aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button>
+      <h2 id="categoryModalTitle">Nova categoria</h2>
+      <span class="sheet-head-spacer"></span>
+    </div>
+    <div class="sheet-body">
       <input type="hidden" id="categoryOriginalId">
-      <div class="admin-field">
-        <label for="categoryLabel">Nome exibido</label>
+      <div class="field">
+        <label for="categoryLabel">Nome</label>
         <input type="text" id="categoryLabel" required placeholder="Ex: Perfumes Masculinos">
       </div>
-      <div class="admin-field">
-        <label for="categoryId">Identificador (gerado automaticamente)</label>
-        <input type="text" id="categoryId" required>
-      </div>
-      <div class="admin-field">
-        <label for="categorySort">Ordem</label>
-        <input type="number" id="categorySort" value="0">
-      </div>
-      <div class="admin-modal-actions">
-        <button type="button" class="btn-admin-ghost" id="categoryCancelBtn">Cancelar</button>
-        <button type="submit" class="btn-admin-primary">Salvar</button>
-      </div>
-      <p class="admin-save-msg" id="categorySaveMsg"></p>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL BANNER -->
-<div class="admin-modal-overlay" id="bannerModalOverlay" hidden>
-  <div class="admin-modal">
-    <h2 id="bannerModalTitle">Novo banner</h2>
-    <form id="bannerForm">
-      <input type="hidden" id="bannerId">
-      <div class="admin-field">
-        <label for="bannerImageFile">Imagem do banner (recomendado 1200x600px, proporção 2:1)</label>
-        <div class="admin-logo-row">
-          <img id="bannerImagePreview" class="admin-logo-preview" alt="">
-          <input type="file" id="bannerImageFile" accept="image/*">
+      <div class="field-row">
+        <div class="field">
+          <label for="categoryId">Identificador</label>
+          <input type="text" id="categoryId" required autocapitalize="off">
+          <p class="hint">Gerado sozinho a partir do nome.</p>
+        </div>
+        <div class="field field-narrow">
+          <label for="categorySort">Ordem</label>
+          <input type="number" id="categorySort" value="0" inputmode="numeric">
         </div>
       </div>
-      <div class="admin-field">
+    </div>
+    <div class="sheet-foot">
+      <p class="save-msg" id="categorySaveMsg" role="status"></p>
+      <button type="submit" class="abtn abtn-primary abtn-block">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<!-- SHEET BANNER -->
+<div class="sheet-overlay" id="bannerModalOverlay" hidden>
+  <form class="sheet" id="bannerForm" role="dialog" aria-modal="true" aria-labelledby="bannerModalTitle">
+    <div class="sheet-head">
+      <button type="button" class="btn-icon" id="bannerCancelBtn" aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button>
+      <h2 id="bannerModalTitle">Novo banner</h2>
+      <span class="sheet-head-spacer"></span>
+    </div>
+    <div class="sheet-body">
+      <input type="hidden" id="bannerId">
+      <label class="photo-pick photo-pick-wide">
+        <img id="bannerImagePreview" alt="">
+        <span class="photo-pick-empty" id="bannerPhotoEmpty"><svg class="icon"><use href="#i-image"/></svg>Escolher imagem (1200×600)</span>
+        <span class="photo-pick-text" id="bannerPhotoChange">Trocar imagem</span>
+        <input type="file" id="bannerImageFile" accept="image/*">
+      </label>
+      <div class="field">
         <label for="bannerBadgeText">Texto do selo (opcional)</label>
         <input type="text" id="bannerBadgeText" placeholder="Ex: Frete combinado no WhatsApp">
       </div>
-      <div class="admin-field">
+      <div class="field field-narrow">
         <label for="bannerSort">Ordem</label>
-        <input type="number" id="bannerSort" value="0">
+        <input type="number" id="bannerSort" value="0" inputmode="numeric">
       </div>
-      <div class="admin-modal-actions">
-        <button type="button" class="btn-admin-ghost" id="bannerCancelBtn">Cancelar</button>
-        <button type="submit" class="btn-admin-primary" id="bannerSaveBtn">Salvar</button>
-      </div>
-      <p class="admin-save-msg" id="bannerSaveMsg"></p>
-    </form>
-  </div>
+    </div>
+    <div class="sheet-foot">
+      <p class="save-msg" id="bannerSaveMsg" role="status"></p>
+      <button type="submit" class="abtn abtn-primary abtn-block" id="bannerSaveBtn">Salvar</button>
+    </div>
+  </form>
 </div>
 
-<!-- MODAL NOVO ADMIN -->
-<div class="admin-modal-overlay" id="adminModalOverlay" hidden>
-  <div class="admin-modal">
-    <h2>Novo administrador</h2>
-    <form id="adminForm">
-      <div class="admin-field">
+<!-- SHEET NOVO ADMIN -->
+<div class="sheet-overlay" id="adminModalOverlay" hidden>
+  <form class="sheet sheet-short" id="adminForm" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
+    <div class="sheet-head">
+      <button type="button" class="btn-icon" id="adminCancelBtn" aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button>
+      <h2 id="adminModalTitle">Dar acesso ao painel</h2>
+      <span class="sheet-head-spacer"></span>
+    </div>
+    <div class="sheet-body">
+      <div class="field">
         <label for="adminEmail">E-mail</label>
-        <input type="email" id="adminEmail" required>
+        <input type="email" id="adminEmail" required inputmode="email" autocapitalize="off">
       </div>
-      <div class="admin-field">
-        <label for="adminPassword">Senha (mín. 6 caracteres)</label>
-        <input type="text" id="adminPassword" required minlength="6">
+      <div class="field">
+        <label for="adminPassword">Senha</label>
+        <input type="text" id="adminPassword" required minlength="6" autocapitalize="off" autocomplete="new-password">
+        <p class="hint">Mínimo 6 caracteres. A pessoa já entra assim que você salvar; combine a senha com ela.</p>
       </div>
-      <p class="admin-hint">A pessoa já pode entrar com esse e-mail e senha assim que você salvar — combine a senha com ela por fora.</p>
-      <div class="admin-modal-actions">
-        <button type="button" class="btn-admin-ghost" id="adminCancelBtn">Cancelar</button>
-        <button type="submit" class="btn-admin-primary" id="adminSaveBtn">Salvar</button>
-      </div>
-      <p class="admin-save-msg" id="adminSaveMsg"></p>
-    </form>
+    </div>
+    <div class="sheet-foot">
+      <p class="save-msg" id="adminSaveMsg" role="status"></p>
+      <button type="submit" class="abtn abtn-primary abtn-block" id="adminSaveBtn">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<!-- CONFIRMAÇÃO -->
+<div class="sheet-overlay confirm-overlay" id="confirmOverlay" hidden>
+  <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+    <h2 id="confirmTitle">Tem certeza?</h2>
+    <p id="confirmText"></p>
+    <div class="confirm-actions">
+      <button type="button" class="abtn abtn-ghost" id="confirmNo">Cancelar</button>
+      <button type="button" class="abtn abtn-danger" id="confirmYes">Excluir</button>
+    </div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/config.js"></script>

@@ -526,7 +526,7 @@ function initBannerCarousel() {
 async function loadStoreData() {
   try {
     const [prodRes, catRes, settRes, bannerRes] = await Promise.all([
-      sb.from("products").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
+      sb.from("products").select("*").eq("active", true).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
       sb.from("categories").select("*").order("sort_order", { ascending: true }),
       sb.from("settings").select("*"),
       sb.from("banners").select("*").order("sort_order", { ascending: true })
@@ -539,7 +539,9 @@ async function loadStoreData() {
       img: p.img,
       category: p.category
     }));
-    CATEGORIES = catRes.data || [];
+    // só mostra categorias que têm perfume aparecendo no site
+    const usedCategories = new Set(PRODUCTS.map(p => p.category));
+    CATEGORIES = (catRes.data || []).filter(c => usedCategories.has(c.id));
     SETTINGS = {};
     (settRes.data || []).forEach(s => { SETTINGS[s.key] = s.value; });
     BANNERS = bannerRes.data || [];
