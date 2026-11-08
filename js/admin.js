@@ -296,29 +296,28 @@ function renderCategoryFilterOptions() {
 function baseFiltered() {
   const q = normalizeText(productSearch.value.trim());
   const cat = productCategoryFilter.value;
-  return ADMIN_PRODUCTS.filter(p => (!q || normalizeText(p.name).includes(q)) && (!cat || p.category === cat));
+  return ADMIN_PRODUCTS.filter(p => isActive(p) && (!q || normalizeText(p.name).includes(q)) && (!cat || p.category === cat));
 }
 const STATUS_TEST = {
-  all: () => true,
-  active: isActive,
+  active: () => true,
   stock: (p) => stockOf(p) > 0,
   low: (p) => isActive(p) && stockOf(p) > 0 && stockOf(p) <= LOW_STOCK,
   nostock: (p) => isActive(p) && stockOf(p) <= 0,
-  noprice: (p) => !hasPrice(p),
-  hidden: (p) => !isActive(p)
+  noprice: (p) => !hasPrice(p)
 };
 const visibleProducts = () => baseFiltered().filter(STATUS_TEST[statusFilter]);
 
 function renderProductsList() {
   const base = baseFiltered();
   const count = (k) => base.filter(STATUS_TEST[k]).length;
-  [["countAll", "all"], ["countActive", "active"], ["countStock", "stock"], ["countLow", "low"], ["countNoStock", "nostock"], ["countNoPrice", "noprice"], ["countHidden", "hidden"]]
+  [["countActive", "active"], ["countStock", "stock"], ["countLow", "low"], ["countNoStock", "nostock"], ["countNoPrice", "noprice"]]
     .forEach(([id, k]) => { $(id).textContent = count(k); });
 
   const active = ADMIN_PRODUCTS.filter(isActive);
-  const units = ADMIN_PRODUCTS.reduce((s, p) => s + Math.max(0, stockOf(p)), 0);
-  const value = ADMIN_PRODUCTS.reduce((s, p) => s + Math.max(0, stockOf(p)) * (COSTS[p.id] || 0), 0);
+  const units = active.reduce((s, p) => s + Math.max(0, stockOf(p)), 0);
+  const value = active.reduce((s, p) => s + Math.max(0, stockOf(p)) * (COSTS[p.id] || 0), 0);
   $("statActive").textContent = active.length.toLocaleString("pt-BR");
+  $("catalogCtaSub").textContent = `${active.length} de ${ADMIN_PRODUCTS.length} perfumes do catálogo na sua lista`;
   $("statUnits").textContent = units.toLocaleString("pt-BR");
   $("statValue").textContent = Math.round(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -326,13 +325,11 @@ function renderProductsList() {
   const filtered = productSearch.value || productCategoryFilter.value;
   if (list.length === 0) {
     const EMPTY = {
-      active: `<strong>Nenhum perfume em "Trabalho"</strong>Vá em "Não trabalho", selecione os que você vende e toque em "Trabalho".`,
+      active: `<strong>Sua lista está vazia</strong>Toque em "Escolher os perfumes que eu trabalho" e marque os que você vende.`,
       stock: `<strong>Nada em estoque ainda</strong>Toque em "Chegou mercadoria" no Início para lançar o que comprou.`,
       low: `<strong>Nada acabando</strong>Nenhum perfume que você trabalha está com ${LOW_STOCK} ou menos.`,
       nostock: `<strong>Tudo com estoque</strong>`,
       noprice: `<strong>Todos têm preço</strong>`,
-      hidden: `<strong>Nenhum em "Não trabalho"</strong>`,
-      all: `<strong>Nenhum perfume cadastrado</strong>Toque no + para cadastrar.`
     };
     productList.innerHTML = `<li class="list-empty">${filtered ? "<strong>Nada encontrado</strong>Tente outro nome ou limpe os filtros." : EMPTY[statusFilter]}</li>`;
   } else {
@@ -353,9 +350,6 @@ function renderProductsList() {
             </span>
           </span>
         </button>
-        <label class="row-toggle" title="${on ? "Trabalho" : "Não trabalho"}">
-          <input type="checkbox" class="switch" data-action="toggle" ${on ? "checked" : ""} aria-label="Trabalho com ${escapeHtml(p.name)}">
-        </label>
       </li>`;
     }).join("");
   }
@@ -393,10 +387,7 @@ productList.addEventListener("click", (e) => {
   if (suppressNextClick) { suppressNextClick = false; return; }
   if (selecting) toggleSelected(row.dataset.id); else openProductModal(row.dataset.id);
 });
-productList.addEventListener("change", (e) => {
-  const sw = e.target.closest("input[data-action='toggle']");
-  if (sw) setProductsActive([sw.closest(".row").dataset.id], sw.checked, { quiet: true });
-});
+
 // segurar o dedo liga a seleção
 let pressTimer = null, pressStart = null;
 productList.addEventListener("pointerdown", (e) => {
@@ -466,8 +457,14 @@ bulkBar.addEventListener("click", async (e) => {
   if (!ids.length) return;
   const a = btn.dataset.bulk;
   if (a === "entry") openEntry(ids);
-  if (a === "show") await setProductsActive(ids, true);
-  if (a === "hide") await setProductsActive(ids, false);
+  if (a === "hide") {
+    const ok = await askConfirm({
+      title: ids.length === 1 ? "Tirar da sua lista?" : `Tirar ${ids.length} perfumes da sua lista?`,
+      text: "Saem de Perfumes, de Vender e do site, mas continuam no catálogo. Para voltar, use \"Escolher os perfumes que eu trabalho\".",
+      yes: "Tirar", danger: false
+    });
+    if (ok) await setProductsActive(ids, false);
+  }
   if (a === "more") openSheet($("bulkMoreOverlay"));
 });
 $("bulkDeleteBtn").addEventListener("click", async () => {
@@ -508,6 +505,99 @@ async function setProductsActive(ids, active, { quiet = false } = {}) {
     showToast("Não deu para salvar: " + err.message);
   }
 }
+
+// ---------- catálogo: escolher os perfumes que trabalho ----------
+let catSel = new Set(), catOrig = new Set(), catCat = "", catOnlyMarked = false;
+function openCatalog() {
+  catOrig = new Set(ADMIN_PRODUCTS.filter(isActive).map(p => p.id));
+  catSel = new Set(catOrig);
+  catCat = ""; catOnlyMarked = false;
+  $("catalogSearch").value = "";
+  clearMsg($("catalogMsg"));
+  const cats = ADMIN_CATEGORIES.filter(c => ADMIN_PRODUCTS.some(p => p.category === c.id));
+  $("catalogCats").innerHTML = `<button class="chip active" data-cat="">Tudo</button><button class="chip" data-cat="__marked">Marcados</button>` +
+    cats.map(c => `<button class="chip" data-cat="${escapeHtml(c.id)}">${escapeHtml(c.label)}</button>`).join("");
+  renderCatalog();
+  openSheet($("catalogOverlay"));
+}
+function catalogVisible() {
+  const q = normalizeText($("catalogSearch").value.trim());
+  return ADMIN_PRODUCTS.filter(p => (!q || normalizeText(p.name).includes(q)) &&
+    (catCat === "__marked" ? catSel.has(p.id) : (!catCat || p.category === catCat)));
+}
+function renderCatalog() {
+  const list = catalogVisible();
+  $("catalogList").innerHTML = list.length ? list.map(p => `
+    <li class="row${catSel.has(p.id) ? " is-selected" : ""}" data-id="${p.id}" role="checkbox" aria-checked="${catSel.has(p.id)}" tabindex="0">
+      <span class="check-box" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>
+      <img class="thumb" src="${escapeHtml(p.img)}" alt="" loading="lazy" decoding="async">
+      <span class="row-text"><span class="row-name">${escapeHtml(p.name)}</span>
+        <span class="row-meta">${hasPrice(p) ? `<span class="row-price">${formatBRL(p.price)}</span>` : `<span class="pill pill-bad">Sem preço</span>`}<span>· ${escapeHtml(categoryLabel(p.category))}</span>${stockOf(p) > 0 ? `<span class="pill pill-ok">${stockOf(p)} em estoque</span>` : ""}</span></span>
+    </li>`).join("") : `<li class="list-empty"><strong>Nada encontrado</strong></li>`;
+  updateCatalogFoot();
+}
+function updateCatalogFoot() {
+  let add = 0, rem = 0;
+  catSel.forEach(id => { if (!catOrig.has(id)) add++; });
+  catOrig.forEach(id => { if (!catSel.has(id)) rem++; });
+  $("catalogCount").textContent = plural(catSel.size, "marcado", "marcados");
+  $("catalogDiff").textContent = add || rem ? [add ? `+${add} na lista` : "", rem ? `−${rem} saindo` : ""].filter(Boolean).join(" · ") : "Nenhuma mudança";
+  $("catalogSaveBtn").disabled = !add && !rem;
+}
+$("openCatalogBtn").addEventListener("click", openCatalog);
+$("catalogSearch").addEventListener("input", renderCatalog);
+$("catalogCats").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  setChip($("catalogCats"), b);
+  catCat = b.dataset.cat;
+  renderCatalog();
+});
+$("catalogList").addEventListener("click", (e) => {
+  const r = e.target.closest(".row[data-id]");
+  if (!r) return;
+  const id = r.dataset.id;
+  if (catSel.has(id)) catSel.delete(id); else catSel.add(id);
+  const on = catSel.has(id);
+  r.classList.toggle("is-selected", on);
+  r.setAttribute("aria-checked", on);
+  updateCatalogFoot();
+});
+$("catalogMarkPriced").addEventListener("click", () => { ADMIN_PRODUCTS.filter(hasPrice).forEach(p => catSel.add(p.id)); renderCatalog(); });
+$("catalogMarkList").addEventListener("click", () => { catalogVisible().forEach(p => catSel.add(p.id)); renderCatalog(); });
+$("catalogUnmarkList").addEventListener("click", () => { catalogVisible().forEach(p => catSel.delete(p.id)); renderCatalog(); });
+$("catalogCloseBtn").addEventListener("click", async () => {
+  const changed = [...catSel].some(id => !catOrig.has(id)) || [...catOrig].some(id => !catSel.has(id));
+  if (changed && !await askConfirm({ title: "Sair sem salvar?", text: "As marcações que você fez não vão valer.", yes: "Sair sem salvar", no: "Continuar marcando" })) return;
+  closeSheet($("catalogOverlay"));
+});
+$("catalogOverlay").addEventListener("click", (e) => {
+  if (e.target !== $("catalogOverlay")) return;
+  e.stopImmediatePropagation(); // não fecha sozinho: pergunta se tem mudança
+  $("catalogCloseBtn").click();
+}, true);
+$("catalogSaveBtn").addEventListener("click", async () => {
+  const add = [...catSel].filter(id => !catOrig.has(id));
+  const rem = [...catOrig].filter(id => !catSel.has(id));
+  const btn = $("catalogSaveBtn");
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try {
+    for (const [ids, active] of [[add, true], [rem, false]]) {
+      for (const part of chunk(ids, 100)) {
+        const { error } = await sb.from("products").update({ active }).in("id", part);
+        if (error) throw error;
+      }
+    }
+    ADMIN_PRODUCTS.forEach(p => { if (add.includes(p.id)) p.active = true; if (rem.includes(p.id)) p.active = false; });
+    closeSheet($("catalogOverlay"));
+    const noPrice = add.filter(id => !hasPrice(productById(id))).length;
+    showToast(`Lista salva: ${plural(catSel.size, "perfume", "perfumes")}.${noPrice ? ` ${noPrice} sem preço só aparece${noPrice === 1 ? "" : "m"} no site com preço.` : ""}`);
+    setStatusFilter("active");
+    HOOKS.data.forEach(fn => fn());
+  } catch (err) {
+    formError($("catalogMsg"), "Não deu para salvar: " + err.message);
+  } finally { btn.disabled = false; btn.textContent = "Salvar"; }
+});
 
 // ---------- excluir ----------
 async function deleteProducts(ids) {

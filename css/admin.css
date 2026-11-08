@@ -713,6 +713,18 @@ body.has-cart .toast { bottom: calc(var(--nav-h) + var(--safe-b) + 96px); }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
+/* escolher perfumes */
+.pick-cta { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; border-radius: var(--r); background: linear-gradient(135deg, rgba(42, 92, 224, .28), rgba(255, 122, 26, .14)); border: 1px solid #34478a; text-align: left; }
+.pick-cta-ic { width: 42px; height: 42px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--cta); color: var(--cta-ink); }
+.pick-cta strong { font-size: 15px; }
+.pick-cta > svg:last-child { color: var(--muted); }
+.sheet-full { height: 94vh; height: 94dvh; }
+.catalog .row .check-box { display: grid; }
+.catalog .row { min-height: 64px; cursor: pointer; }
+.catalog .thumb { width: 48px; height: 48px; }
+.catalog-actions .btn { min-height: 38px; font-size: 13px; padding: 0 12px; }
+@media (min-width: 1024px) { .sheet-full { max-width: 720px; height: 88vh; } .pick-cta { max-width: 520px; } }
+
 /* ajustes finos */
 .page-head h2 { display: none; }
 .page-head { justify-content: flex-end; }

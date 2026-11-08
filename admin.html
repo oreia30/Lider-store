@@ -158,8 +158,13 @@
           <button class="btn btn-cta" id="newProductBtn"><svg class="i sm"><use href="#i-plus"/></svg><span>Novo perfume</span></button>
         </div>
       </div>
+      <button type="button" class="pick-cta" id="openCatalogBtn">
+        <span class="pick-cta-ic"><svg class="i"><use href="#i-select"/></svg></span>
+        <span class="cc-text"><strong>Escolher os perfumes que eu trabalho</strong><small id="catalogCtaSub">Marque no catálogo o que você vende</small></span>
+        <svg class="i sm"><use href="#i-chev"/></svg>
+      </button>
       <div class="stats3">
-        <div><span>Trabalho</span><strong id="statActive">0</strong></div>
+        <div><span>Na sua lista</span><strong id="statActive">0</strong></div>
         <div><span>Unidades</span><strong id="statUnits">0</strong></div>
         <div><span>Valor (custo)</span><strong id="statValue">R$ 0</strong></div>
       </div>
@@ -169,13 +174,11 @@
         <select id="productCategoryFilter" aria-label="Categoria"><option value="">Todas as categorias</option></select>
       </div>
       <div class="chips" role="tablist" aria-label="Filtrar" id="statusFilter">
-        <button role="tab" class="chip active" data-status="active">Trabalho <span class="count" id="countActive">0</span></button>
+        <button role="tab" class="chip active" data-status="active">Todos <span class="count" id="countActive">0</span></button>
         <button role="tab" class="chip" data-status="stock">Com estoque <span class="count" id="countStock">0</span></button>
         <button role="tab" class="chip" data-status="low">Acabando <span class="count" id="countLow">0</span></button>
         <button role="tab" class="chip" data-status="nostock">Sem estoque <span class="count" id="countNoStock">0</span></button>
         <button role="tab" class="chip" data-status="noprice">Sem preço <span class="count" id="countNoPrice">0</span></button>
-        <button role="tab" class="chip" data-status="hidden">Não trabalho <span class="count" id="countHidden">0</span></button>
-        <button role="tab" class="chip" data-status="all">Todos <span class="count" id="countAll">0</span></button>
       </div>
       <div class="select-all-row" id="selectAllRow" hidden>
         <label class="check-label">
@@ -434,8 +437,7 @@
     </div>
     <div class="bulk-actions">
       <button class="bulk-btn bulk-accent" data-bulk="entry"><svg class="i"><use href="#i-box-in"/></svg><span>Entrada</span></button>
-      <button class="bulk-btn" data-bulk="show"><svg class="i"><use href="#i-eye"/></svg><span>Trabalho</span></button>
-      <button class="bulk-btn" data-bulk="hide"><svg class="i"><use href="#i-eye-off"/></svg><span>Não trabalho</span></button>
+      <button class="bulk-btn" data-bulk="hide"><svg class="i"><use href="#i-eye-off"/></svg><span>Tirar da lista</span></button>
       <button class="bulk-btn" data-bulk="more"><svg class="i"><use href="#i-more"/></svg><span>Mais</span></button>
     </div>
   </div>
@@ -664,6 +666,32 @@
     </div>
     <div class="sheet-foot"><p class="msg" id="ratesMsg"></p><button type="submit" class="btn btn-cta btn-block">Salvar taxas</button></div>
   </form>
+</div>
+
+<!-- Catálogo: escolher os perfumes que trabalho -->
+<div class="overlay" id="catalogOverlay" hidden>
+  <div class="sheet sheet-full" role="dialog" aria-modal="true" aria-labelledby="catalogTitle">
+    <div class="sheet-head"><span class="grab"></span>
+      <h2 class="h-display" id="catalogTitle">Perfumes que eu trabalho</h2>
+      <button type="button" class="icon-btn" id="catalogCloseBtn" aria-label="Fechar"><svg class="i sm"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-body">
+      <p class="muted small">Marque os perfumes que você vende. Só eles aparecem em Perfumes, em Vender e no site. Nada muda até você tocar em Salvar.</p>
+      <label class="search"><svg class="i sm"><use href="#i-search"/></svg>
+        <input type="search" id="catalogSearch" placeholder="Buscar no catálogo" autocomplete="off"></label>
+      <div class="chips" id="catalogCats"></div>
+      <div class="btn-row catalog-actions">
+        <button type="button" class="btn btn-ghost" id="catalogMarkPriced">Marcar todos com preço</button>
+        <button type="button" class="btn btn-ghost" id="catalogMarkList">Marcar os da lista</button>
+        <button type="button" class="btn btn-ghost" id="catalogUnmarkList">Desmarcar os da lista</button>
+      </div>
+      <ul class="list catalog" id="catalogList"></ul>
+    </div>
+    <div class="sheet-foot">
+      <div class="total-line"><span id="catalogDiff">Nenhuma mudança</span><strong class="num" id="catalogCount">0 marcados</strong></div>
+      <p class="msg" id="catalogMsg"></p>
+      <button type="button" class="btn btn-cta btn-block" id="catalogSaveBtn">Salvar</button>
+    </div>
+  </div>
 </div>
 
 <!-- Mais opções da seleção -->
