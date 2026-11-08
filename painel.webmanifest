@@ -1,0 +1,14 @@
+{
+  "name": "Líder Store · Painel",
+  "short_name": "Líder Painel",
+  "start_url": "/admin.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#060c24",
+  "theme_color": "#060c24",
+  "icons": [
+    { "src": "/assets/logo/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/logo/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/assets/logo/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
